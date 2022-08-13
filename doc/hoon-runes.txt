@@ -1,0 +1,7079 @@
+*hoon-runes.txt*  Syntax and semantics for Hoon's rune system
+
+           -------------------------------------------------------
+                            HOON RUNES REFERENCE
+           -------------------------------------------------------
+
+Author: ~talfus-laddus
+Repository: https://git.sr.ht/~talfus-laddus/hoon-runes.vim
+License: MIT License
+Updated: 2022-08-12
+
+Runes are a way to form expressions in Hoon.
+
+
+==============================================================================
+DOT                                                                  *dot* *.*
+
+Anything Nock can do, Hoon can do also. These runes are used for carrying out
+Nock operations in Hoon.
+
+------------------------------------------------------------------------------
+DOTKET                                                           *dotket* *.^*
+
+Load from the Arvo namespace (scry) with a fake Nock instruction: Nock 12.
+
+Syntax~
+
+Two arguments, with the second optionally split into an arbitrary number of
+elements.
+
+While this rune technically takes a fixed number of arguments, `q` is usually
+split into at least two parts, and the tall form of this rune must be
+terminated with a `==`. Note also that the `==` does not make the arguments
+into a list as you might expect, so `q` must be explicitly null-terminated if
+its elements are specified separately.
+
+Tall:
+>
+    .^  p
+      q1
+      q2
+      q3
+      qn
+    ==
+<
+Wide:
+>
+    .^(p q1 q2)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%dtkt p=spec q=hoon]
+<
+Produces~
+
+The noun `q`, cast to the type `p`.
+
+Discussion~
+
+Nock has no `12` instruction! But the virtual Nock used to run userspace code
+does. Nock `12` loads from a typed immutable namespace defined by its virtual
+context.
+
+Ordinarily a Hoon expression has access to no information but whatever can be
+found in the subject. The one exception is with the `.^` rune. It essentially
+allows you to request information from one of the Arvo vanes (modules).
+
+`.^` checks that the type of the value retrieved from Arvo nests under `p`.
+`q` is a `path` which includes information about which vane is being queried,
+and what sort of information is requested.
+
+In principle `.^` takes two subexpressions, but in practice `q` is often given
+in two parts: the first part includes the vane to be queried (e.g., `%a` for
+Ames, `%b` for Behn, `%c` for Clay, etc.) and the kind of request. The second
+part is a path that corresponds to the kind of request.
+
+Examples~
+
+In the dojo we can ask Clay -- the Arvo filesystem -- for a listing of the
+files at our current path, `%`:
+>
+    > .^(arch %cy %)
+    [ fil=~
+        dir
+      { [p=~.app q=~]
+        [p=~.sur q=~]
+        [p=~.gen q=~]
+        [p=~.lib q=~]
+        [p=~.mar q=~]
+        [p=~.ted q=~]
+        [p=~.desk q=~]
+        [p=~.sys q=~]
+      }
+    ]
+<
+The `%c` is for Clay, and the `y` is for the request type. `arch` is the type
+of the listing. See `gen/cat.hoon` to see how this information is printed more
+prettily.
+
+The `%` is for the current path in the dojo:
+>
+    > `path`%
+    /~zod/base/~2018.9.20..23.05.35..0231
+<
+You can modify the time of the file listing quite simply and ask for a listing
+from 5 hours ago. (Remember that Clay is a revision-controlled file system.)
+>
+    > .^(arch %cy /(scot %p our)/base/(scot %da (sub now ~h5)))
+    [ fil=~
+        dir
+      { [p=~.app q=~]
+        [p=~.sur q=~]
+        [p=~.gen q=~]
+        [p=~.lib q=~]
+        [p=~.mar q=~]
+        [p=~.ted q=~]
+        [p=~.desk q=~]
+        [p=~.sys q=~]
+      }
+    ]
+<
+`our` is the value for your ship's name.
+
+
+------------------------------------------------------------------------------
+DOTLUS                                                           *dotlus* *.+*
+
+Increment an atom with Nock `4`.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    .+  p
+<
+Wide:
+>
+    .+(p)
+<
+Irregular:
+>
+      +(p)
+<
+AST~
+>
+    [%dtls p=hoon]
+<
+Produces~
+
+`p` plus `1` if `p` is an atom; otherwise, crashes. The product atom has no
+aura.
+
+Examples~
+>
+    > .+(6)
+    7
+    
+    > +(6)
+    7
+    
+    > +(%foo)
+    7.303.015
+    
+    > +([1 2])
+    nest-fail
+<
+
+------------------------------------------------------------------------------
+DOTTAR                                                           *dottar* `.*`
+
+Evaluate with Nock `2`.
+
+Produces~
+
+Nock of formula `q` and subject `p`, with type `%noun`.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    .*  p
+    q
+<
+Wide:
+>
+    .*(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%dttr p=hoon q=hoon]
+<
+Discussion~
+
+`.*(p q)` is used to run Nock formula `q` on the subject `p` from within Hoon.
+
+Keep in mind that `p` and `q` can be arbitrary Hoon expressions, as long as
+they evaluate to the appropriate nouns for Nock evaluation.
+
+Note also that `.*` ("dottar") can be used to bypass the type system. It's
+therefore possible to use Hoon as a typeless language.
+
+Examples~
+>
+    > .*([20 30] [0 2])
+    20
+    
+    > .*(33 [4 0 1])
+    34
+    
+    > .*(|.(50) [9 2 0 1])
+    50
+    
+    > .*(12 [7 [`1 [4 `1]] [`2 `3 `2]])
+    [12 13 12]
+    
+    > .*(~ [5 1^4 [4 1^3]])
+    0
+    
+    > .*(~ [5 1^5 [4 1^3]])
+    1
+<
+
+------------------------------------------------------------------------------
+DOTTIS                                                           *dottis* *.=*
+
+Test for equality with Nock `5`.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    .=  p
+    q
+<
+Wide:
+>
+    .=(p q)
+<
+Irregular:
+>
+      =(p q)
+<
+AST~
+>
+    [%dtts p=hoon q=hoon]
+<
+Produces~
+
+`%.y` if `p` equals `q`; otherwise `%.n`.
+
+Discussion~
+
+Like Nock equality, `.=` ("dottis") tests whether two nouns are the same,
+ignoring invisible pointer structure. Because in a conventional noun
+implementation each noun has a lazy short hash, comparisons are fast unless
+the hash needs to be computed, or we are comparing separate copies of
+identical nouns. (Comparing large duplicates is a common cause of performance
+bugs.)
+
+Examples~
+>
+    > .=(0 0)
+    %.y
+    
+    > =(0 0)
+    %.y
+    
+    > .=(1 2)
+    %.n
+    
+    > =(1 2)
+    %.n
+    
+    > =(12 [12 14])
+    %.n
+<
+
+------------------------------------------------------------------------------
+DOTWUT                                                           *dotwut* *.?*
+
+Test for cell or atom with Nock `3`.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    .?  p
+<
+Wide:
+>
+    .?(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%dtwt p=hoon]
+<
+Produces~
+
+`%.y` if `p` is a cell; otherwise `%.n`.
+
+Examples~
+>
+    > .?(42)
+    %.n
+    
+    > .?([42 43])
+    %.y
+<
+
+==============================================================================
+ZAP                                                                  *zap* *!*
+
+------------------------------------------------------------------------------
+ZAPCOM                                                           *zapcom* *!,*
+
+Produce the Hoon AST of an expression.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    !,  p
+    q
+<
+Wide:
+>
+    !,(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpcm p=hoon q=hoon]
+<
+Discussion~
+
+This produces the `$hoon` AST of expression `q`. The first argument, `p`, is
+always an example of the `$hoon` type, typically just the `*hoon` bunt value,
+and is used for type inference. The reason for `p` is just to handle
+transitions if the `$hoon` type changes.
+
+Examples~
+>
+    > !,  *hoon  [1 1]
+    [%cltr p=~[[%sand p=%ud q=1] [%sand p=%ud q=1]]]
+    
+    > !,  *hoon  (add 1 1)
+    [%cncl p=[%wing p=~[%add]] q=~[[%sand p=%ud q=1] [%sand p=%ud q=1]]]
+<
+
+------------------------------------------------------------------------------
+ZAPGAR                                                           *zapgar* *!>*
+
+Wrap a noun in its type (form a `vase`).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    !>  p
+<
+Wide:
+>
+    !>(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpgr p=hoon]
+<
+Produces~
+
+A cell whose tail is the product of `p`, and whose head is the static type of
+`p`.
+
+Discussion~
+
+In Hoon, a dynamic type is a static type compiled at runtime. This type-noun
+cell is generally called a `vase`.
+
+Examples~
+>
+    > !>(1)
+    [#t/@ud q=1]
+<
+If you want just the type value, use a 'type spear'. This is `-:!>`, i.e., the
+head of the cell produced by `!>`:
+>
+    > -:!>(1)
+    #t/@ud
+<
+
+------------------------------------------------------------------------------
+ZAPGAL                                                           *zapgal* *!<*
+
+Extracts a `vase` to the given mold if its type nests.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    !<  p
+    q
+<
+Wide:
+>
+    !<(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpgl p=spec q=hoon]
+<
+Produces~
+
+The value of vase `q` typed with the type of mold `p` if possible, else a
+`nest-fail`.
+
+Discussion~
+
+This is something like a partial inverse to the `!>` rune and can be used to
+extract a typed value from a `vase`.
+
+Examples~
+>
+    > !<  @  !>  ~zod
+    0
+    
+    > !<  @p  !>  0
+    nest-fail
+    
+    > !<  tape  !>("foobar")
+    "foobar"
+<
+
+------------------------------------------------------------------------------
+ZAPMIC                                                           *zapmic* *!;*
+
+Wrap a noun in its type (raw).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    !;  p
+    q
+<
+Wide:
+>
+    !;(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpmc p=hoon q=hoon]
+<
+Discussion~
+
+This wraps the product of `q` in its inferred type. It's a raw version of
+`!>`. Unlike zapgar, `q` is not given a `p` face and its type information is
+not stripped to a raw noun.
+
+The first field, `p`, must be an example of the `$type` type, typically just
+`*type` (the bunt of `$type`). The `p` argument is just so transitions can be
+handled if the `$type` type changes.
+
+It's unlikely you'd use this rune directly; `!>` is much more typical.
+
+Examples~
+>
+    > !;  *type  [1 1]
+    [#t/[@ud @ud] 1 1]
+    
+    > !;  *type  'foo'
+    [#t/@t 'foo']
+<
+
+------------------------------------------------------------------------------
+ZAPTIS                                                           *zaptis* *!=*
+
+Make the Nock formula for a Hoon expression.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    !=  p
+<
+Wide:
+>
+    !=(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpts p=hoon]
+<
+Produces~
+
+The Nock generated by `p`.
+
+Discussion~
+
+Don't confuse `!=` with a negation, `!`, followed by a test for equality,
+`=(10 11)`.
+
+Examples~
+>
+    > !=(20)
+    [1 20]
+    
+    > !=(~zod)
+    [1 0]
+    
+    > !=((add 2 2))
+    [8 [9 3.110.356 0 31] 9 2 [0 4] [7 [0 3] 1 2 2] 0 11]
+<
+Don't confuse the `!=` rune with:
+>
+    > !=(10 11)
+    %.y
+    
+    > !=(10 10)
+    %.n
+<
+The syntax difference is that a test for equality takes two subexpressions,
+and the `!=` rune only one.
+
+
+------------------------------------------------------------------------------
+ZAPWUT                                                           *zapwut* *!?*
+
+Restrict Hoon version.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    !?  p
+    q
+<
+Wide:
+>
+    !?(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpwt p=$@(p=@ [p=@ q=@]) q=hoon]
+<
+Produces~
+
+When `p` is an atom:
+
+- `q` if `p` ≥ Hoon kelvin version, otherwise crash.
+
+
+When `p` is a cell:
+
+- `q`, if `p.p` ≥ Hoon kelvin version ≥ `q.p`, otherwise crash.
+
+
+(Versions count down; the current version is 140.)
+
+Examples~
+>
+    > !?  [142 140]  (add 2 2)
+    4
+    
+    > !?  142  (add 2 2)
+    4
+    
+    > !?  64  (add 2 2)
+    ! exit
+<
+
+------------------------------------------------------------------------------
+ZAPPAT                                                           *zappat* *!@*
+
+Branch on whether a wing exists.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    !@  p
+      q
+    r
+<
+Wide:
+>
+    !@(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zppt p=(list wing) q=hoon r=hoon]
+<
+Discussion~
+
+`p` is a wing reference like `foo`, `bar.foo`, etc. If `p` exists, `q`. If `p`
+does not exist, `r`. Essentially, this is like `?:` for wing existence.
+
+Examples~
+>
+    > =foo 42
+    
+    > !@(foo 'exists' 'does not exist')
+    'exists'
+    
+    > !@(baz 'exists' 'does not exist')
+    'does not exist'
+<
+
+------------------------------------------------------------------------------
+ZAPZAP                                                           *zapzap* *!!*
+
+Crash.
+
+Syntax~
+
+No arguments.
+
+Tall:
+>
+    !!
+<
+Wide:
+>
+    !!
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%zpzp ~]
+<
+Produces~
+
+Nothing. Always crashes, with type `%void`.
+
+Discussion~
+
+`%void` nests in every other type, so you can stub out anything with `!!`.
+
+Examples~
+>
+    > !!
+    dojo: hoon expression failed
+<
+
+------------------------------------------------------------------------------
+ZAPCOL                                                           *zapcol* *!:*
+
+Turn on stack trace.
+
+Syntax~
+
+One argument, fixed
+
+Tall:
+>
+    !:  p
+<
+Wide:
+>
+    !:(p)
+<
+Irregular:
+
+- None.
+
+
+Produces~
+
+The product of `p` unless `p` crashes, in which case a stack trace is given.
+
+Discussion~
+
+`!:` is used to turn on a debugging stack trace option for any code you have
+in `p`.
+
+Examples~
+>
+    > ?:(=(0 1) 123 !!)
+    dojo: hoon expression failed
+    
+    > !:  ?:(=(0 1) 123 !!)
+    /~zod/base/~2022.4.2..08.54.53..07d7:<[1 5].[1 22]>
+    /~zod/base/~2022.4.2..08.54.53..07d7:<[1 19].[1 21]>
+    dojo: hoon expression failed
+<
+
+------------------------------------------------------------------------------
+ZAPDOT                                                           *zapdot* *!.*
+
+Turn off stack trace for a subexpression `p`
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    !.  p
+<
+Wide:
+>
+    !.(p)
+<
+Irregular:
+
+- None.
+
+
+Produces~
+
+The product of `p`. If `p` crashes, no stack trace entries are given for that
+code.
+
+Discussion~
+
+`!.` is used to turn off a debugging stack trace option for any code you have
+in `p`. This rune can be embedded under a `!:` rune for inner loops of your
+code that you don't want or need to trace. This is especially useful if a
+trace overflows the stack.
+
+Examples~
+>
+    > %.(1 |=(a=@ ^-(@ ?:(=(a 10) !! $(a +(a))))))
+    dojo: hoon expression failed
+    
+    > !:  %.(1 |=(a=@ ^-(@ ?:(=(a 10) !! $(a +(a))))))
+    /~zod/base/~2022.4.2..08.56.45..5ecc:<[1 5].[1 49]>
+    /~zod/base/~2022.4.2..08.56.45..5ecc:<[1 17].[1 47]>
+    /~zod/base/~2022.4.2..08.56.45..5ecc:<[1 22].[1 46]>
+    ...skipping some lines...
+    /~zod/base/~2022.4.2..08.56.45..5ecc:<[1 22].[1 46]>
+    /~zod/base/~2022.4.2..08.56.45..5ecc:<[1 33].[1 35]>
+    dojo: hoon expression failed
+    
+    > !:  %.(1 !.(|=(a=@ ^-(@ ?:(=(a 10) !! $(a +(a)))))))
+    /~zod/base/~2022.4.2..08.57.07..d40b:<[1 5].[1 53]>
+    dojo: hoon expression failed
+<
+
+
+==============================================================================
+TIS                                                                  *tis* *=*
+
+These runes modify the subject. (Or more precisely, they evaluate at least one
+of their subexpressions with a modified subject.)
+
+Overview~
+
+Hoon doesn't have variables in the ordinary sense. If you want to bind a name
+to a value, e.g., `a` to `12`, you do so by pinning `12` to the subject and
+associating the name with it. This sort of operation is done with the `=`
+family of runes.
+
+Let's say you have some old subject `p`. To 'pin' a value to the head means to
+modify the subject by repacing it with a cell of `[new-value p]`. The head of
+the cell is the new value. So to pin `12` with the face `a` the new subject
+would be: `[a=12 p]`.
+
+Of course there are many variations on ways to modify the subject, useful for
+different situations. Hence the whole family of `=` runes.
+
+
+------------------------------------------------------------------------------
+TISGAR                                                           *tisgar* *=>*
+
+Compose two expressions.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    =>  p
+    q
+<
+Wide:
+>
+    =>(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tsgr p=hoon q=hoon]
+<
+Produces~
+
+the product of `q`, with the product of `p` taken as the subject.
+
+Examples~
+>
+    > =>([a=1 b=2 c=3] b)
+    2
+    
+    > =>  9  .
+    9
+    
+    > =>((add 2 4) [. .])
+    [6 6]
+    
+    > =>
+      |%
+      ++  foo
+        |=  [a=@ b=@]
+        [b a]
+      --
+      (foo 42 27)
+    [27 42]
+<
+
+------------------------------------------------------------------------------
+TISBAR                                                           *tisbar* *=|*
+
+Combine a named noun with the subject by "bunting" (producing the default
+value) of a given mold.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    =|  p
+    q
+<
+Wide:
+>
+    =|(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tsbr p=spec q=hoon]
+<
+Expands to~
+>
+    =+(*p q)
+<
+Discussion~
+
+The default (or 'bunt') value of `p` is pinned to the head of the subject.
+Usually `p` includes a name for ease of reference.
+
+Speaking more loosely, `=|` usually "declares a variable" which is
+"uninitialized," presumably because you'll set it in a loop or similar.
+
+Examples~
+>
+    > =|  a=@ud  a
+    0
+    
+    > =|  a=[@t @t @t]  a
+    ['' '' '']
+<
+
+------------------------------------------------------------------------------
+TISCOL                                                           *tiscol* *=:*
+
+Change multiple legs in the subject.
+
+Syntax~
+
+Two arguments: the first a variable number of pairs, the second is fixed.
+
+Tall:
+>
+    =:  p1a  p1b
+        p2a  p2b
+        p3a  p3b
+      ==
+    q
+<
+Wide:
+>
+    =:(p1a p1b, p2a p2b, p3a p3b q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tscl p=(list (pair wing hoon)) q=hoon]
+<
+Expands to~
+>
+    =>(%_(. p) q)
+<
+Discussion~
+
+This rune is like `=.`, but for modifying the values of multiple legs of the
+subject.
+
+Examples~
+>
+    > =+  a=[b=1 c=2]
+      =:  c.a  4
+          b.a  3
+        ==
+      a
+    [b=3 c=4]
+<
+
+------------------------------------------------------------------------------
+TISCOM                                                           *tiscom* *=,*
+
+Expose namespace.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    =,  p
+    q
+<
+Wide:
+>
+    =,(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tscm p=hoon q=hoon]
+<
+Produces~
+
+`p` evaluates to a noun with some namespace. From within `q` you may access
+`p`'s names without a wing path (i.e., you can use face `b` rather than
+`b.p`).
+
+Discussion~
+
+This is especially useful for calling arms from an imported library core or
+for calling arms from a stdlib core repeatedly. For example, JSON reparsers
+like `so:dejs:format` and `of:dejs:format` can be called as `so` and `of`
+after doing:
+>
+    =,  dejs:format
+<
+Examples~
+
+With an imported core:
+>
+    > (sum -7 --7)
+    -find.sum
+    dojo: hoon expression failed
+    
+    > (sum:si -7 --7)
+    --0
+    
+    > =,  si  (sum -7 --7)
+    --0
+<
+With a dojo-defined face:
+>
+    > =/  fan  [bab=2 baz=[3 qux=4]]
+      =,  fan
+      [bab qux.baz]
+    [2 4]
+<
+
+------------------------------------------------------------------------------
+TISDOT                                                           *tisdot* *=.*
+
+Change one leg in the subject.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    =.  p  q
+    r
+<
+Wide:
+>
+    =.(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tsdt p=wing q=hoon r=hoon]
+<
+Expands to~
+>
+    =>(%_(. p q) r)
+<
+Discussion~
+
+Technically the `=.` rune doesn't change the subject. It creates a new subject
+just like the old one except for a changed value at `p`. Note that the
+mutation uses `%_` ("cencab"), so the type at `p` doesn't change. Trying to
+change the value type results in a `nest-fail`.
+
+Examples~
+>
+    > =+  a=[b=1 c=2]
+      =.  b.a  3
+      a
+    [b=3 c=2]
+    
+    > =+  a=[b=1 c=2]
+      =.(b.a 3 a)
+    [b=3 c=2]
+    
+    > =+  a=[b=1 c=2]
+      =.(b.a "hello" a)
+    nest-fail
+<
+
+------------------------------------------------------------------------------
+TISHEP                                                           *tishep* *=-*
+
+Combine a new noun with the subject, inverted.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    =-  p
+    q
+<
+Wide:
+>
+    =-(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tshp p=hoon q=hoon]
+<
+Expands to~
+>
+    =>([q .] p)
+<
+Discussion~
+
+`=-` is just like `=+` but its subexpressions are reversed. `=-` looks better
+than `=+` when the expression you're pinning to the subject is much smaller
+than the expression that uses it.
+
+Examples~
+>
+    > =foo  |=  a=@
+            =+  b=1
+            =-  (add a b c)
+            c=2
+    > (foo 5)
+    8
+<
+
+------------------------------------------------------------------------------
+TISKET                                                           *tisket* *=^*
+
+Pin the head of a pair; change a leg with the tail.
+
+Syntax~
+
+Four arguments, fixed.
+
+Tall:
+>
+    =^  p  q
+      r
+    s
+<
+Wide:
+>
+    =^(p q r s)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tskt p=skin q=wing r=hoon s=hoon]
+<
+Expands to~
+>
+    =/(p -.r =.(q +.r s))
+<
+Discussion~
+
+- `p` is a new name (optionally with type) to pin to the subject.
+- `q` is the name of an existing wing of the subject.
+- `r` is an expression that produces `[p-value new-q-value]`.
+- `s` is some more code to be evaluted against the modified subject.
+
+
+This is a bit like doing `=/` and `=.` at the same time. It's useful for state
+machines, where you want to produce both effects and a new state. For example,
+many arms of a Gall agent produce `[effects new-state]` in the form of a
+`(quip card _this)`. In the `++on-poke` arm, you might have something like:
+>
+    =^  cards  state
+      (handle-poke !<(action vase))
+    [cards this]
+<
+This may also remind you of Haskell's State monad.
+
+Examples~
+
+The `og` core is a stateful pseudo-random number generator. We have to change
+the core state every time we generate a random number, so we use `=^`:
+>
+    ~zod:dojo> =+  rng=~(. og 420)
+               =^  r1  rng  (rads:rng 100)
+               =^  r2  rng  (rads:rng 100)
+               [r1 r2]
+    [99 46]
+<
+
+------------------------------------------------------------------------------
+TISGAL                                                           *tisgal* *=<*
+
+Compose two expressions, inverted.
+
+Syntax~
+
+Two arguments, fixed
+
+Tall:
+>
+    =<  p
+    q
+<
+Wide:
+>
+    =<(p q)
+<
+Irregular:
+>
+      p:q
+<
+AST~
+>
+    [%tsgl p=hoon q=hoon]
+<
+Expands to~
+>
+    =>(q p)
+<
+Discussion~
+
+`=<` is just `=>` backwards.
+
+Examples~
+>
+    > =<(b [a=1 b=2 c=3])
+    2
+    
+    > =<  b
+      [a=1 b=2 c=3]
+    2
+    
+    > b:[a=1 b=2 c=3]
+    2
+    
+    > [. .]:(add 2 4)
+    [6 6]
+<
+
+------------------------------------------------------------------------------
+TISLUS                                                           *tislus* *=+*
+
+Combine a new noun with the subject.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    =+  p
+    q
+<
+Wide:
+>
+    =+(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tsls p=hoon q=hoon]
+<
+Expands to~
+>
+    =>([p .] q)
+<
+Discussion~
+
+The subject of the `=+` expression, call it `a`, becomes the cell `[p a]` for
+the evaluation of `q`. That is, `=+` 'pins a value', `p`, to the head of the
+subject.
+
+Loosely speaking, `=+` is the simplest way of "declaring a variable."
+
+Examples~
+>
+    > =+  42  -
+    42
+    
+    > =+  x=42  x
+    42
+    
+    > =+  [a='foo' b='bar']  a
+    'foo'
+<
+
+------------------------------------------------------------------------------
+TISMIC                                                           *tismic* *=;*
+
+Combine a named noun with the subject, possibly with type annotation; inverted
+order.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    =;  p
+      q
+    r
+<
+Wide:
+>
+    =;(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tsmc p=skin q=hoon r=hoon]
+<
+Expands to~
+>
+    =/(p r q)
+<
+Discussion~
+
+`=;` is exactly like `=/` except that the order of its last two subexpressions
+is reversed.
+
+Examples~
+>
+    > =foo  |=  a=@
+            =/   b  1
+            =;   c=@
+              :(add a b c)
+            2
+    > (foo 5)
+    8
+<
+
+------------------------------------------------------------------------------
+TISFAS                                                           *tisfas* *=/*
+
+Combine a named noun with the subject, possibly with type annotation.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    =/  p
+      q
+    r
+<
+Wide:
+>
+    =/(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tsfs p=skin q=hoon r=hoon]
+<
+Expands to~
+
+if `p` is a name, (e.g. `a`):
+>
+    =+(^=(p q) r)
+<
+if `p` is a name with a type (e.g., `a=@`):
+>
+    =+(^-(p q) r)
+<
+Desugaring~
+>
+    ?@  p
+      =+  p=q
+      r
+    =+  ^-($=(p.p q.p) q)
+    r
+<
+Discussion~
+
+`p` can be either a name or a `name=type`. If it's just a name, `=/`
+("tisfas") "declares a type-inferred variable." If it has a type, `=/`
+"declares a type-checked variable."
+
+Examples~
+>
+    > =/  a=@t  'hello'  a
+    'hello'
+    
+    > =/  x  [1 2 3]  x
+    [1 2 3]
+    
+    > =foo  |=  a=@
+            =/  b  1
+            =/  c=@  2
+            :(add a b c)
+    > (foo 5)
+    8
+<
+
+------------------------------------------------------------------------------
+TISSIG                                                           *tissig* *=~*
+
+Compose many expressions.
+
+Syntax~
+
+Variable number of arguments.
+
+Tall:
+>
+    =~  p1
+        p2
+        p3
+        pn
+    ==
+<
+Wide:
+>
+    =~(p1 p2 p3 pn)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tssg p=(list hoon)]
+<
+Produces~
+
+The product of the chain composition.
+
+Examples~
+>
+    > =~  10
+          [20 .]
+          [30 .]
+          [40 .]
+          .
+      ==
+    [40 30 20 10]
+    
+    > =~  [sub (mul 3 20) (add 10 20)]
+          (sub +)
+          +(.)
+      ==
+    31
+    
+    > =foo =|  n=@
+           =<  =~  increment
+                   increment
+                   increment
+                   n
+               ==
+           |%
+           ++  increment
+             ..increment(n +(n))
+           --
+    > foo
+    3
+<
+
+------------------------------------------------------------------------------
+TISTAR                                                           *tistar* `=*`
+
+Define a deferred expression.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    =*  p
+      q
+    r
+<
+Wide:
+>
+    =*(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tstr p=term q=hoon r=hoon]
+<
+Produces~
+
+`r`, compiled with a subject in which `p` is a deferred expression for `q`.
+
+Discussion~
+
+`=*` assigns a name to an expression that will be evaluated in each place the
+name is dereferenced. This allows you to "write" through it to the original
+subject `axis`. `q` is recorded in the type information of `p`, and `q` is
+calculated every time you use `p`.
+
+This rune has some similarities with macros, and some similarities with
+aliases, but it is not really either.
+
+This rune is commonly used to give a Gall agent's state the name `state` like:
+>
+    =*  state  -
+<
+This lets you reference the whole `state` while also being able to reference
+its individual elements like `foo` and `bar`, without having to do
+`foo.state`, `bar.state`, etc.
+
+Examples~
+>
+    > =+  a=1
+      =*  b  a
+      [a b]
+    [1 1]
+    
+    > =+  a=1
+      =*  b  a
+      =.  a  2
+      [a b]
+    [2 2]
+<
+
+------------------------------------------------------------------------------
+TISWUT                                                           *tiswut* *=?*
+
+Conditionally change one leg in the subject.
+
+Syntax~
+
+Four arguments, fixed.
+
+Tall:
+>
+    =?  p  q
+      r
+    s
+<
+Wide:
+>
+    =?(p q r s)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%tswt p=wing q=hoon r=hoon s=hoon]
+<
+Expands to~
+>
+    =.  p  ?:(q r p)
+    s
+<
+Discussion~
+
+Use `=?` to replace the value of leg `p` with `r` on condition `q`. As usual,
+we are not actually mutating the subject, just creating a new subject with a
+changed value. The change in value includes a type check against the old
+subject; the type of `r` must nest under the type of `p`.
+
+Examples~
+>
+    > =a 12
+    
+    > =?(a =(1 1) 22 a)
+    22
+    
+    > =?(a =(1 2) 22 a)
+    12
+<
+
+==============================================================================
+WUT                                                                  *wut* *?*
+
+Hoon has the usual program control branches. It also has the usual logical
+operators: AND `?&`, OR `?|`, and NOT `?!`. It also has a `?=` rune that tests
+whether a value matches a given type. In the course of type inference, Hoon
+learns from `?=` tests in the test condition of `?:` ("wutcol") expressions.
+
+Overview~
+
+All `?` runes reduce to `?:` and/or `?=`.
+
+If the condition of an `?:` is a `?=`, and the `?=` is testing a leg of the
+subject, the compiler specializes the subject type for the branches of the
+`?:`. Branch inference also works for expressions which expand to `?:`.
+
+The test does not have to be a single `?=`; the compiler can analyze arbitrary
+boolean logic (`?&` ("wutpam"), `?|` ("wutbar"), `?!` ("wutzap")) with full
+short-circuiting. Equality tests (`.=` ("dottis")) are not analyzed.
+
+If the compiler detects that the branch is degenerate (only one side is
+taken), it fails with an error.
+
+
+------------------------------------------------------------------------------
+WUTBAR                                                           *wutbar* *?|*
+
+Logical OR.
+
+Syntax~
+
+Variable number of arguments.
+
+Tall:
+>
+    ?|  p1
+        p2
+        p3
+        pn
+    ==
+<
+Wide:
+>
+    ?|(p1 p2 p3 pn)
+<
+Irregular:
+>
+      |(p1 p2 p3 pn)
+<
+AST~
+>
+    [%wtbr p=(list hoon)]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `p`:
+>
+    ?:(a & ?:(b & ?:(c & ?:(... ?:(z & |)))))
+<
+Desugaring~
+>
+    |-
+    ?~  p
+      |
+    ?:  i.p
+      &
+    $(p t.p)
+<
+Produces~
+
+If any argument evaluates to true (`%.y`), true. If all arguments evaluate to
+false (`%.n`), false.
+
+Examples~
+>
+    > |(=(6 42) =(42 42))
+    %.y
+    
+    > |(=(6 42) =(42 43))
+    %.n
+<
+
+------------------------------------------------------------------------------
+WUTHEP                                                           *wuthep* *?-*
+
+Switch against a union, with no default.
+
+Syntax~
+
+One fixed argument, then a variable number of pairs.
+
+Tall: style #1>
+    ?-  p
+      q1a  q1b
+      q2a  q2b
+      qna  qnb
+    ==
+<
+Tall: style #2>
+    ?-    p
+        q1a
+      q1b
+    ::
+        q2a
+      q2b
+    ::
+        qna
+      qnb
+    ==
+<
+Wide:
+>
+    ?-(p q1a q1b, q2a q2b, qna qnb)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wthp p=wing q=(list (pair spec value))]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `q`:
+>
+    ?:  ?=(p.a p)  q.a
+    ?:  ?=(p.b p)  q.b
+    ?:  ?=(p.c p)  q.c
+    ...
+    ~|(%mint-lost !!)
+<
+Desugaring~
+>
+    |-
+    ?.  q
+      ~|(%mint-lost !!)
+    ?:  ?=(p.i.q p)
+      q.i.q
+    $(q t.q)
+<
+Discussion~
+
+The `?-` rune is for a conditional expression in which the type of `p`
+determines which branch is taken. Usually the type of `p` is a union of other
+types. There is no default branch.
+
+The compiler makes sure that your code neither misses a case of the union, nor
+includes a double case that isn't there. This is not special handling for
+`?-`, just a consequence of the semantics of `?:`, which `?-` reduces to.
+
+A missing case will throw the `mint-lost` error. An extra case will throw
+`mint-vain`.
+
+Examples~
+>
+    > =cor  |=  vat=?(%a %b)
+            ?-  vat
+              %a  20
+              %b  42
+            ==
+    
+    > (cor %a)
+    20
+    
+    > (cor %b)
+    42
+    
+    > (cor %c)
+    ! nest-fail
+<
+
+------------------------------------------------------------------------------
+WUTCOL                                                           *wutcol* *?:*
+
+Branch on a boolean test.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    ?:  p
+      q
+    r
+<
+Wide:
+>
+    ?:(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtcl p=hoon q=hoon r=hoon]
+<
+Produces~
+
+If `p` produces true (`%.y`), then `q`. If `p` produces false (`%.n`), then
+`r`. If `p` is not a boolean, compiler yells at you.
+
+Discussion~
+
+If test analysis reveals that either branch is never taken, or if `p` is not a
+boolean, compilation fails. An untaken branch is indicated with `mint-lost`.
+
+Note also that all other branching expressions reduce to `?:`.
+
+Examples~
+>
+    > ?:((gth 1 0) 3 4)
+    3
+    
+    > ?:  (gth 1 0)
+        3
+      4
+    3
+    
+    > ?:((gth 1 2) 3 4)
+    4
+    
+    > ?:  (gth 1 2)
+        3
+      4
+    4
+<
+
+------------------------------------------------------------------------------
+WUTDOT                                                           *wutdot* *?.*
+
+Branch on a boolean test, inverted.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    ?.  p
+      q
+    r
+<
+Wide:
+>
+    ?.(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtdt p=hoon q=hoon r=hoon]
+<
+Expands to~
+>
+    ?:(p r q)
+<
+Discussion~
+
+`?.` is just like `?:`, but with its last two subexpressions reversed.
+
+As is usual with inverted forms, use `?.` when the true-case expression is
+much taller and/or wider than the false-case expression.
+
+Examples~
+>
+    > ?.((gth 1 2) 3 4)
+    3
+    
+    > ?.(?=(%a 'a') %not-a %yup)
+    %yup
+    
+    > ?.  %.y
+        'this false case is less heavy than the true case'
+      ?:  =(2 3)
+        'two not equal to 3'
+      'but see how \'r is much heavier than \'q?'
+    'but see how \'r is much heavier than \'q?'
+<
+
+------------------------------------------------------------------------------
+WUTKET                                                           *wutket* *?^*
+
+Branch on whether a wing of the subject is a cell.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    ?^  p
+      q
+    r
+<
+Wide:
+>
+    ?^(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtkt p=wing q=hoon r=hoon]
+<
+Expands to~
+>
+    ?:(?=(^ p) q r)
+<
+Discussion~
+
+The type of the wing, `p`, must not be known to be either an atom or a cell,
+or else you'll get a `mint-vain` error at compile time. `mint-vain` means that
+one of the `?^` branches, `q` or `r`, is never taken.
+
+Examples~
+>
+    > ?^(0 1 2)
+    ! mint-vain
+    ! exit
+    
+    > ?^(`*`0 1 2)
+    2
+    
+    > ?^(`*`[1 2] 3 4)
+    3
+<
+
+------------------------------------------------------------------------------
+WUTGAL                                                           *wutgal* *?<*
+
+Negative assertion.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ?<  p
+    q
+<
+Wide:
+>
+    ?<(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtgl p=hoon q=hoon]
+<
+Expands to~
+>
+    ?:(p !! q)
+<
+Discussion~
+
+`?<` is used to force a crash when some condition `p` doesn't yield false
+(`%.n`). It can be used for type inference with the `?=` rune, much like the
+`?>` rune.
+
+Examples~
+>
+    > ?<(=(3 4) %foo)
+    %foo
+    
+    > ?<(=(3 3) %foo)
+    dojo: hoon expression failed
+    
+    > =a `*`[12 14]
+    
+    > `^`a
+    nest-fail
+    
+    > ?<(?=(@ a) `^`a)
+    [12 14]
+<
+
+------------------------------------------------------------------------------
+WUTGAR                                                           *wutgar* *?>*
+
+Positive assertion.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ?>  p
+    q
+<
+Wide:
+>
+    ?>(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtgr p=hoon q=hoon]
+<
+Expands to~
+>
+    ?.(p !! q)
+<
+Discussion~
+
+`?>` is used to force a crash when some condition `p` doesn't yield true
+(`%.y`). It can be used for type inference, with the `?=` rune, to specify the
+type of a value.
+
+Examples~
+>
+    > ?>(=(3 3) %foo)
+    %foo
+    
+    > ?>(=(3 4) %foo)
+    dojo: hoon expression failed
+    
+    > =a `*`123
+    
+    > `@`a
+    nest-fail
+    
+    > ?>(?=(@ a) `@`a)
+    123
+<
+
+------------------------------------------------------------------------------
+WUTLUS                                                           *wutlus* *?+*
+
+Switch against a union, with a default.
+
+Syntax~
+
+Two fixed arguments, then a variable number of pairs.
+
+Tall: style #1>
+    ?+  p  q
+      r1a  r1b
+      r2a  r2b
+      rna  rnb
+    ==
+<
+Tall: style #2>
+    ?+    p  q
+        r1a
+      r1b
+    ::
+        r2a
+      r2b
+    ::
+        rna
+      rnb
+    ==
+<
+Wide:
+>
+    ?+(p q r1a r1b, r2a r2b, rna rnb)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtls p=wing q=hoon r=(list (pair spec hoon))]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `r`:
+>
+    ?:  ?=(p.a p)  q.a
+    ?:  ?=(p.b p)  q.b
+    ?:  ?=(p.c p)  q.c
+    ...
+    q
+<
+Desugaring~
+>
+    |-
+    ?.  r
+      q
+    ?:  ?=(p.i.r p)
+      q.i.r
+    $(r t.r)
+<
+Discussion~
+
+The `?+` rune is for a conditional expression in which the type of `p`
+determines which branch is taken. Usually the type of `p` is a union of other
+types. If `p`'s type doesn't match the case for any given branch, the default
+expression, `q`, is evaluated.
+
+If there is a case that is never taken you'll get a `mint-vain` error.
+
+Examples~
+>
+    > =cor  |=  vat=@tas
+            ?+  vat  240
+              %a  20
+              %b  42
+            ==
+    
+    > (cor %a)
+    20
+    
+    > (cor %b)
+    42
+    
+    > (cor %c)
+    240
+<
+
+------------------------------------------------------------------------------
+WUTPAM                                                           *wutpam* *?&*
+
+Logical AND.
+
+Syntax~
+
+Variable arguments.
+
+Tall:
+>
+    ?&  p1
+        p2
+        pn
+    ==
+<
+Wide:
+>
+    ?&(p1 p2 pn)
+<
+Irregular:
+>
+      &(p1 p2 pn)
+<
+AST~
+>
+    [%wtpm p=(list hoon)]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `p`:
+>
+    ?.(a | ?.(b | ?.(c | ?.(... ?.(z | &)))))
+<
+Desugaring~
+>
+    |-
+    ?~  p
+      &
+    ?.  i.p
+      |
+    $(p t.p)
+<
+Produces~
+
+If ALL arguments evaluate to true (`%.y`), true (`%.y`). If one or more
+evalute to false (`%.n`), false (`%.n`).
+
+Examples~
+>
+    > &(=(6 6) =(42 42))
+    %.y
+    
+    > &(=(6 7) =(42 42))
+    %.n
+<
+
+------------------------------------------------------------------------------
+WUTPAT                                                           *wutpat* *?@*
+
+Branch on whether a wing of the subject is an atom.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    ?@  p
+      q
+    r
+<
+Wide:
+>
+    ?@(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtpt p=wing q=hoon r=hoon]
+<
+Expands to~
+>
+    ?:(?=(@ p) q r)
+<
+Produces~
+
+If `p` is an atom, `q`. If `p` is a cell, `r`.
+
+Discussion~
+
+The type of the wing, `p`, must not be known to be either an atom or a cell,
+or else you'll get a `mint-vain` error at compile time. `mint-vain` means that
+one of the `?@` branches, `q` or `r`, is never taken.
+
+Examples~
+>
+    > ?@(0 1 2)
+    ! mint-vain
+    ! exit
+    
+    > ?@(`*`0 1 2)
+    1
+    
+    > ?@(`*`[1 2] 3 4)
+    4
+<
+
+------------------------------------------------------------------------------
+WUTSIG                                                           *wutsig* *?~*
+
+Branch on whether a wing of the subject is null.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    ?~  p
+      q
+    r
+<
+Wide:
+>
+    ?~(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtsg p=wing q=hoon r=hoon]
+<
+Expands to~
+>
+    ?:(?=($~ p) q r)
+<
+Produces~
+
+If `p` is null (`~`), `q`. If `p` is non-null, `r`.
+
+Discussion~
+
+It's bad style to use `?~` to test for any zero atom. Use it only for a true
+null, `~`.
+
+Examples~
+>
+    > =foo ""
+    
+    > ?~(foo 1 2)
+    1
+<
+
+------------------------------------------------------------------------------
+WUTTIS                                                           *wuttis* *?=*
+
+Test pattern match.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ?=  p
+    q
+<
+Wide:
+>
+    ?=(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%wtts p=spec q=wing]
+<
+Produces~
+
+`%.y` (true) if the noun at `q` is in the type of `p`; `%.n` (false)
+otherwise.
+
+Discussion~
+
+`?=` is not as powerful as it might seem. For instance, it can't generate a
+loop -- you cannot (and should not) use it to test whether a `*` is a `(list
+@)`. Nor can it validate atomic auras.
+
+Patterns should be as weak as possible. Unpack one layer of union at a time.
+Don't confirm things the type system knows.
+
+For example, when matching from a tagged union for the type `[%foo p=@ q=[@
+@]]`, the appropriate pattern is `[%foo *]`. You have one question, which is
+whether the head of the noun is `%foo`.
+
+A common error is `find.$`, meaning `p` is not a type.
+
+Examples~
+>
+    > =bar [%foo %bar %baz]
+    > ?=([%foo *] bar)
+    %.y
+<
+
+------------------------------------------------------------------------------
+WUTZAP                                                           *wutzap* *?!*
+
+Logical NOT.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ?!  p
+<
+Wide:
+>
+    ?!(p)
+<
+Irregular:
+>
+      !p
+<
+AST~
+>
+    [%wtzp p=hoon]
+<
+Expands to~
+>
+    .=(| p)
+<
+Produces~
+
+The logical NOT of `p`, which must evaluate to either `%.y` or `%.n`.
+
+Examples~
+>
+    ~zod:dojo> ?!(.=(1 2))
+    %.y
+    
+    ~zod:dojo> !&
+    %.n
+    
+    ~zod:dojo> !|
+    %.y
+    
+    ~zod:dojo> !(gth 5 6)
+    %.y
+<
+
+==============================================================================
+BAR                                                                  *bar* *|*
+
+Core expressions produce cores. A core is a cell of `[battery payload]`. The
+`battery` is code, a battery of Nock formulas. The `payload` is the data
+needed to run those formulas correctly.
+
+Five core runes (`|=`, `|.`, `|-`, `|*`, and `|$`) produce a core with a
+single arm, named `$`. As with all arms, we can recompute `$` with changes,
+which is useful for recursion among other things.
+
+------------------------------------------------------------------------------
+BARBUC                                                           *barbuc* *|$*
+
+Declares a mold builder wet gate with one or more molds as its sample.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    |$  sample
+    body
+<
+Wide:
+>
+    |$(sample body)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brbc sample=(lest term) body=spec]
+<
+Expands to~
+>
+    |$  [a b]
+    body
+<
+becomes
+>
+    |*  [a=$~(* $-(* *)) b=$~(* $-(* *))]
+    ^:
+    body
+<
+Semantics~
+
+`|$` is used to declare a wet gate mold builder that is polymorphic in its
+input molds. `a` is a `lest` of `term` used as identifiers for the input
+molds. `b` is a structure built from elements of `a`. The output of `|$` is a
+mold builder obtained by substituting the input molds parameterized by `a`
+into `b`.
+
+Discussion~
+
+A mold builder is a wet gate from one or more molds to a mold. A mold is a
+function from nouns to nouns with types that may be partial, is always
+idempotent, and usually the identity function on the noun itself.
+
+`|$` is a restricted form of `|*`. The use of `|$` over `|*` is one of style,
+as either could be used to make wet gates that are mold builders. The buc in
+`|$` is a hint that `|$` is closely related to buc runes, and thus `|$` should
+be used to make mold builders, while `|*` should be used for any other sort of
+wet gate. Unlike `|*`, the body of `|$` is parsed in pattern mode to a
+`$spec`. Thus, the second argument of `|$` is frequently a buc rune. For
+further discussion of wet gates, see the entry for `|*`.
+
+Like other single-arm cores, the arm for `|$` is named `$` and this can be
+used to define recursive structures. Note however that Hoon is evaluated
+eagerly, and so infinite structures are not permitted.
+
+Proper style for `|$` is to enclose the first argument with brackets, even if
+it is only a single term. The interpeter will accept a single term without
+brackets just fine, but this style is for consistency with the fact that the
+first argument is a `lest`.
+
+Examples~
+>
+    > =foo |$([a b] [b a])
+    
+    > =bar (foo [@ @tas])
+    
+    > (bar %cat 3)
+    [%cat 3]
+<
+
+------------------------------------------------------------------------------
+BARCAB                                                           *barcab* *|_*
+
+Produce a door (a core with a sample).
+
+Syntax~
+
+One fixed argument, then a variable number of `+`-family expressions.
+
+Tall:
+>
+    |_  a=spec
+    ++  b=term  c=hoon
+    ++  d=term  e=hoon
+         ...
+    ++  f=term  g=hoon
+    --
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+Note: The `++` rune may be replaced with any other rune in the `+` family.
+
+AST~
+>
+    [%brcb p=spec q=alas r=(map term tome)]
+<
+Expands to~
+>
+    =|  a=spec
+    |%
+    ++  b=term  c=hoon
+    ++  d=term  e=hoon
+           ...
+    ++  f=term  g=hoon
+    --
+<
+Semantics~
+
+The product of a `|_` expression is a door, a core with one or more arms whose
+payload includes a sample. That is, a door is a cell of `[battery [sample
+context]]`, where the `battery` contains one or more arms.
+
+`a` defines the door sample type and usually includes a name assignment (e.g.,
+`n=@`). `a` is followed by a series of arm definitions, each of which begins
+with a rune in the `+` family (most of `++`). There must be at least one arm,
+but there may be arbitrarily many. Each arm must include a name (`b`, `d`, and
+`f` above), which is followed by the expression (`c`, `e`, and `g` above) that
+defines the arm product.
+
+The context of the door is the subject of the `|_` expression.
+
+Discussion~
+
+A door is the general case of a gate (function). A gate is a door with only
+one arm, which has the name `$`.
+
+Calling a door is like calling a gate except the caller also needs to specify
+the arm to be computed. So, for example, if you have some door `door` which
+contains some arm `arm`, and you want to pass some argument (i.e., input value
+`arg`), you would call it with `~(arm door arg)`.
+
+Because gates are also doors, you can call them the same way. To call the gate
+`foo` as a door, instead of `(foo baz)` we would write `~($ foo baz)`. This is
+an irregular form for `%~($ foo baz)`, %~.
+
+Examples~
+
+A trivial door:
+>
+    > =mol  |_  a=@ud
+            ++  succ  +(a)
+            ++  prev  (dec a)
+            --
+    
+    > ~(succ mol 1)
+    2
+    
+    > ~(succ mol ~(succ mol ~(prev mol 5)))
+    6
+<
+A more interesting door, from the kernel library:
+>
+    ++  ne
+      |_  tig=@
+      ++  d  (add tig '0')
+      ++  x  ?:((gte tig 10) (add tig 87) d)
+      ++  v  ?:((gte tig 10) (add tig 87) d)
+      ++  w  ?:(=(tig 63) '~' ?:(=(tig 62) '-' ?:((gte tig 36) (add tig 29) x)))
+      --
+<
+The `ne` door prints a digit in base 10, 16, 32 or 64:
+>
+    ~zod:dojo> `@t`~(x ne 12)
+    'c'
+<
+
+------------------------------------------------------------------------------
+BARCOL                                                           *barcol* *|:*
+
+Produce a gate with a custom sample.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    |:  a
+    b
+<
+Wide:
+>
+    |:(a b)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brcl p=hoon q=hoon]
+<
+Semantics~
+
+`a` is a Hoon expression whose product type defines which values the gate
+accepts, and it usually includes a name (e.g., `n=1`). The product of `a` also
+serves as the default value of the sample. `b` is a Hoon expression that
+determines the product value of the gate.
+
+Expands to~
+>
+    =+  a
+    |.  b
+<
+Discussion~
+
+Pick your own default value for the sample. Note that `a` is an ordinary
+expression, not a type; `|:` doesn't bunt a sample as `|=` does.
+
+This is useful if you want a gate to have a sample of a particular type, but
+you don't want the default value of the gate to be the default value of that
+type.
+
+Examples~
+>
+    > =add-ten |:(n=`@`2 (add n 10))
+    
+    > (add-ten 10)
+    20
+    
+    > (add-ten)
+    12
+<
+
+------------------------------------------------------------------------------
+BARCEN                                                           *barcen* *|%*
+
+Produce a core, `[battery payload]`.
+
+Syntax~
+
+Argument: a variable number of `+`-family expressions.
+
+Tall:
+>
+    |%
+    ++  a=term  b=hoon
+    ++  c=term  d=hoon
+         ...
+    ++  e=term  f=hoon
+    --
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+Note: The `++` rune may be replaced with any other rune in the `+` family.
+
+AST~
+>
+    [%brcn p=(unit term) q=(map term tome)]
+<
+Semantics~
+
+The product of a `|%` expression is a dry core with one or more arms in the
+battery.
+
+The `|%` rune is followed by a series of arm definitions, each of which begins
+with a rune in the `+` family (most of `++`). There must be at least one arm,
+but there may be arbitrarily many. Each arm must include a name (`a`, `c`, and
+`e` above), which is followed by the expression (`b`, `d`, and `f` above) that
+defines the arm product.
+
+The core payload is the subject of the `|%` expression.
+
+Discussion~
+
+A core is a cell of `[battery payload]`, where the `battery` is code and the
+`payload` is data. The `battery` is one or more arms. An arm is a computation
+that takes the core itself as its subject.
+
+The `|%` rune is used to construct a core from a series of arm definitions.
+Each arm definition in the expression begins with an arm rune (`++`, `+$`, or
+`+*`). These arms make up the `battery`. The subject of the `|%` expression is
+used to make the core's `payload`.
+
+A core is like an "object" in a conventional language, but its attributes
+(arms) are functions on the core, not the core and an argument. A "method" on
+a core is an arm that produces a gate.
+
+Examples~
+
+A trivial core:
+>
+    > =foo  =+  x=58
+            |%
+            ++  n  (add 42 x)
+            ++  g  |=  b=@
+                   (add b n)
+            --
+    
+    > n.foo
+    100
+    
+    > (g.foo 1)
+    101
+<
+
+------------------------------------------------------------------------------
+BARDOT                                                           *bardot* *|.*
+
+Produce a trap (a core with one arm `$`).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    |.  a
+<
+Wide:
+>
+    |.(a)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brdt p=hoon]
+<
+Expands to~
+>
+    |%  ++  $  a=hoon
+    --
+<
+Semantics~
+
+A `|.` expression produces a core with a single arm, `$`. The core isn't
+explicitly given a sample. `a` is a Hoon expression that defines the
+computation of the `$` arm.
+
+The payload of the core is the subject of the `|.` expression.
+
+Discussion~
+
+A trap is generally used to defer a computation.
+
+Examples~
+
+A trivial trap:
+>
+    > =foo |.(42)
+    
+    > $:foo
+    42
+    
+    > (foo)
+    42
+<
+A more interesting trap:
+>
+    > =foo  =/  reps  10
+            =/  step  0
+            =/  outp  0
+            |.
+            ?:  =(step reps)
+              outp
+            $(outp (add outp 2), step +(step))
+    
+    > (foo)
+    20
+<
+Note that we can use `$()` to recurse back into the trap, since it's a core
+with an `$` arm.
+
+`$(...)` expands to `%=($ ...)` ("centis").
+
+
+
+------------------------------------------------------------------------------
+BARKET                                                           *barket* *|^*
+
+Produce a core whose battery includes a `$` arm and compute the latter.
+
+Syntax~
+
+One fixed argument, then a variable number of `+`-family expressions.
+
+Tall:
+>
+    |^  a=hoon
+    ++  b=term  c=hoon
+    ++  d=term  e=hoon
+         ...
+    ++  f=term  g=hoon
+    --
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brkt p=hoon q=(map term tome)]
+<
+Expands to~
+>
+    =>  |%
+        ++  $  a=hoon
+        ++  b=term  c=hoon
+        ++  d=term  e=hoon
+               ...
+        ++  f=term  g=hoon
+        --
+    $
+<
+Semantics~
+
+A `|^` expression produces a multi-arm core whose battery includes a `$` arm,
+which is evaluated immediately. `a` is a Hoon expression that defines the
+product of the `$` arm. `a` is followed by a series of arm definitions for the
+rest of the core battery arms. There must be at least one arm other than the
+`$` arm.
+
+Discussion~
+
+The `|^` rune is useful when you define a multi-arm core in your code and a
+particular arm in it is to be evaluated immediately.
+
+Examples~
+
+A trivial example:
+>
+    > |^
+      (add n g)
+      ++  n  42
+      ++  g  58
+      --
+    100
+<
+
+------------------------------------------------------------------------------
+BARHEP                                                           *barhep* *|-*
+
+Produce a trap (a core with one arm `$`) and evaluate it.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    |-  a
+<
+Wide:
+>
+    |-(a)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brhp p=hoon]
+<
+Expands to~
+>
+    =<($ |.(a=hoon))
+<
+Semantics~
+
+A `|-` expression produces a core with one arm named `$` and immediately
+evaluates `$`. `a` is a Hoon expression that determines what `$` evaluates to.
+
+Discussion~
+
+The `|-` rune can be thought of as a 'recursion point' or a 'loop starting
+point'. Since `|-` makes a `|.` ("bardot", a core with one arm named `$`, we
+can recurse back into it with `$()`.
+
+`$(...)` expands to `%=($ ...)` ("centis").
+
+
+Examples~
+
+A trivial computation doesn't recurse:
+>
+    > |-(42)
+    42
+<
+The classic loop is a decrement:
+>
+    > =foo  =/  a  42
+            =/  b  0
+            |-
+            ?:  =(a +(b))
+              b
+            $(b +(b))
+    
+    > foo
+    41
+<
+
+------------------------------------------------------------------------------
+BARSIG                                                           *barsig* *|~*
+
+Produce an iron gate.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    |~  a
+    b
+<
+Wide:
+>
+    |~(a b)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brsg p=spec q=hoon]
+<
+Expands to~
+>
+    ^|  |=(a b)
+<
+Semantics~
+
+A `|~` expression produces an iron gate. `a` defines the sample, and `b`
+defines the output value of the gate.
+
+Discussion~
+
+See this discussion of core variance models
+
+Examples~
+>
+    > =>  ~  ^+(|~(a=@ *@) |=(a=* *@))
+    <1|usl {a/@ $~}>
+<
+
+------------------------------------------------------------------------------
+BARTAR                                                           *bartar* `|*`
+
+Produce a wet gate (one-armed core with sample).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    |*  a  b
+<
+Wide:
+>
+    |*(a b)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brtr p=spec q=hoon]
+<
+Expands to~
+>
+    =|  a
+    |@
+    ++  $
+      b
+    --
+<
+Semantics~
+
+A `|*` expression produces a wet gate. `a` defines the gate's sample, and `b`
+is a Hoon expression that determines the output value of the gate.
+
+Discussion~
+
+In a normal (dry) gate, your argument is converted into the sample type. In a
+generic (wet) gate, your argument type passes through the function, rather as
+if it were a macro (there is still only one copy of the code, however).
+
+Genericity is a powerful and dangerous tool. Use wet gates only if you know
+what you're doing.
+
+Just as with a gate, we can recurse back into a wet gate with `$()`.
+
+`$(...)` expands to `%=($ ...)` ("centis").
+
+
+`|*` can be used to make wet gates that produce structures, but this usage is
+discouraged in favor of `|$`.
+
+Examples~
+
+Wet and dry gates in a nutshell:
+>
+    > =foo |=([a=* b=*] [b a])
+    
+    > =bar |*([a=* b=*] [b a])
+    
+    > (foo %cat %dog)
+    [6.778.724 7.627.107]
+    
+    > (bar %cat %dog)
+    [%dog %cat]
+<
+The dry gate does not preserve the type of `a` and `b`; the wet gate does.
+
+
+------------------------------------------------------------------------------
+BARTIS                                                           *bartis* *|=*
+
+Produce a gate (a one-armed core with a sample).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    |=  a
+    b
+<
+Wide:
+>
+    |=(a b)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brts p=spec q=hoon]
+<
+Expands to~
+>
+    =+  ^~(*a=spec)
+    |%  ++  $  b=hoon
+    --
+<
+Definition~
+
+The product of a `|=` expression is a dry gate, i.e., a Hoon function.
+
+`p` defines the gate sample type -- i.e., the input value type -- and usually
+includes a sample name assignment (e.g., `a=@`). `q` is an expression that
+determines the output value of the gate.
+
+Discussion~
+
+Dry gates are used for the vast majority of ordinary functions in Hoon.
+
+A gate is a core with one arm named `$`, so we can recurse back into it with
+`$()`.
+
+`$(...)` expands to `%=($ ...)` ("centis").
+
+
+Examples~
+
+A trivial gate:
+>
+    > =foo |=(a=@ +(a))
+    
+    > (foo 20)
+    21
+<
+A slightly less trivial gate:
+>
+    > =foo  |=  [a=@ b=@]
+            (add a b)
+    
+    > (foo 30 400)
+    430
+<
+
+------------------------------------------------------------------------------
+BARPAT                                                           *barpat* *|@*
+
+Produce a 'wet' core `[battery payload]`.
+
+Syntax~
+
+Arguments: a variable number of `+`-family expressions.
+
+Tall:
+>
+    |@
+    ++  a=term  b=hoon
+    ++  c=term  d=hoon
+         ...
+    ++  e=term  f=hoon
+    --
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+Note: The `++` rune may be replaced with any other rune in the `+` family.
+
+AST~
+>
+    [%brpt p=(unit term) q=(map term tome)]
+<
+Semantics~
+
+A `|@` expression produces a 'wet' core whose payload is the expression's
+subject. The various arms in the battery are each named (`a`, `c`, and `e`
+above) and defined explicitly with a Hoon expression (with `b`, `d`, and `f`
+above).
+
+Discussion~
+
+The `|@` rune is just like the `|%` rune except that instead of producing a
+'dry' core, it produces a 'wet' one. This allows for type polymorphism of its
+arms, using 'genericity'. See Advanced types.
+
+
+------------------------------------------------------------------------------
+BARWUT                                                           *barwut* *|?*
+
+Produce a lead trap.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    |?  a
+<
+Wide:
+>
+    |?(a)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%brwt p=hoon]
+<
+Expands to~
+>
+    ^?  |.  a
+<
+Semantics~
+
+A `|?` expression produces a lead trap (i.e., a lead core with one arm named
+`$`). `a` is a Hoon expression that defines what the `$` arm does.
+
+Discussion~
+
+See this discussion of the core variance model.
+
+Examples~
+>
+    > =>  ~  ^+  |?(%a)  |.(%a)
+    <1?pqz $~>
+    
+    > =>  ~  ^+  |?(%a)  |.(%b)
+    nest-fail
+<
+
+==============================================================================
+LUS                                                                  *lus* *+*
+
+A core is a cell of `[battery payload]`. The battery is made of one or more
+arms, each of which is a computation on its parent core.
+
+Arm runes are used to define arms in a core, and thus can only be used from
+within an expression that produces a multi-arm core. That means arm runes
+cannot be used to mark the beginning of a first-class expression -- there is
+no such thing in Hoon as an arm without a core.
+
+There are various arm runes you can use to produce different kinds of arms.
+Normal arms use `++`; arms defining a structure (or 'mold') use `+$`; and
+constructor arms use `+*`.
+
+------------------------------------------------------------------------------
+LUSBAR                                                           *lusbar* *+|*
+
+Chapter label (not useful)
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    +|  %label
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+Discussion~
+
+The `+|` doesn't produce an arm. It instead provides a label for the arms that
+follow it. The arms of a core can be divided into chapters for 'organization'.
+Chapter labels aren't part of the underlying noun of the core; they're stored
+as type system metadata only.
+
+See `tome` in the Hoon standard library.
+
+Note: The `+|` rune has little practical utility. Chapter labels cannot be
+referenced short of manually processing the `$type` of a core.
+
+Examples~
+
+Let's look at what the Hoon compiler's parser, `ream`, does with the `+|`
+rune:
+>
+    > (ream '|%  +|  %numbers  ++  two  2  ++  three  3  --')
+    [ %brcn
+      p=~
+        q
+      { [ p=%numbers
+          q=[p=~ q={[p=%three q=[%sand p=%ud q=3]] [p=%two q=[%sand p=%ud q=2]]}]
+        ]
+      }
+    ]
+<
+Notice that `p.q` has the label `%numbers`. Contrast with:
+>
+    > (ream '|%  ++  two  2  ++  three  3  --')
+    [ %brcn
+      p=~
+        q
+      { [ p=%$
+          q=[p=~ q={[p=%three q=[%sand p=%ud q=3]] [p=%two q=[%sand p=%ud q=2]]}]
+        ]
+      }
+    ]
+<
+
+------------------------------------------------------------------------------
+LUSBUC                                                           *lusbuc* *+$*
+
+Produce a structure arm (type definition).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    +$  p=term  q=spec
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+`p` is an arm name, and `q` is any structure expression.
+
+Discussion~
+
+Arms produced by `+$` are essentially type definitions. They should be used
+when one wants to define custom types using core arms.
+
+The Hoon subexpression, `q`, must be a structure expression. That is, it must
+be either a basic structure expression (`*`, `~`, `^`, `?`, and `@`), or a
+complex expression made with the `$` family of runes (including irregular
+variants). Names of structures are also permitted (e.g., `tape`).
+
+Examples~
+>
+    > =c |%
+           +$  atom-pair  $:(@ @)
+           +$  flag-atom  $:(? @)
+         --
+    
+    > `atom-pair.c`[12 14]
+    [12 14]
+    
+    > `atom-pair.c`[12 [22 33]]
+    nest-fail
+    
+    > `flag-atom.c`[& 22]
+    [%.y 22]
+<
+
+------------------------------------------------------------------------------
+LUSLUS                                                           *luslus* *++*
+
+Produce a normal arm.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ++  p=term  q=hoon
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+`p` is the arm name, and `q` is any Hoon expression.
+
+Discussion~
+
+All arms must have a name (e.g., `add`). An arm is computed by name
+resolution. (This resolution is implicit in the case of `$` arms. See `|=`,
+`|-`, and `|^`.) The `++` rune is used for explicitly giving a name to an arm.
+
+Any Hoon expression, `q`, may be used to define the arm computation.
+
+Examples~
+>
+    > =c |%
+           ++  two  2
+           ++  increment  |=(a=@ +(a))
+         --
+    
+    > two.c
+    2
+    
+    > (increment.c 11)
+    12
+<
+
+------------------------------------------------------------------------------
+LUSTAR                                                           *lustar* `+*`
+
+Defines deferred expressions within doors.
+
+Syntax~
+
+Arguments: A variable number of pairs.
+
+Tall:
+>
+    +*  a=term  b=hoon
+        c=term  d=hoon
+        ...
+        e=term  f=hoon
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+`a`, `c`, `e` are arm names and `b`, `d`, `f` are any Hoon expression. Note
+that unlike all other runes with a variable number of arguments, the list of
+arguments of `+*` does not end with a terminator.
+
+`+*` arms must always come at the beginning of the battery, before any other
+type of lus arm.
+
+Discussion~
+
+The primary use of `+*` is to create deferred expressions within doors (see
+Examples below). This is a name for an expressions that will be evaluated in
+each place the name is dereferenced. This is a similar concept to aliases or
+macros, but there are some subtle but important differences. Deferred
+expressions given by `+*` do not count towards the number of arms in the door
+and thus are also called "virtual arms", which can be important for things
+like Gall agent cores that require a fixed number of arms.
+
+Under the hood, `+*` gets compiled as `=*`'s (see here for more discussion on
+deferred expressions). `+* foo bar` rewrites each `++` arm beneath it in the
+core to include `=* foo bar`. For example, the interpreter sees the Nock
+compiled from this Hoon expression
+>
+    |_  z=@ud
+    +*  n  1
+    ++  x  (add z n)
+    ++  y  (sub z n)
+    --
+<
+as being identical the Nock compiled from this one:
+>
+    =|  z=@ud
+    |%
+    ++  x
+      =*  n  1
+      (add z n)
+    ++  y
+      =*  n  1
+      (sub z n)
+    --
+<
+Examples~
+
+To assign an alias to a door, we often write the following.
+>
+    |_  foo
+    +*  this  .
+<
+This is the idomatic way to assign the alias `this` to the door.
+
+Sometimes cores, such as Gall app cores, have a fixed number of arms, but
+you'd like to include more. This is where aliases employed as "virtual arms"
+may be of use. We note that it is often better style to compose cores with
+`=>` or `=<` to add more arms to a Gall app core. This usage of `+*` is
+controversial and should be minimized.
+>
+    |_  =bowl:gall
+    +*  this  .
+        samp  +<
+        cont  +>
+<
+This assigns the door the alias `this`, the sample of the door `samp`, and the
+context of the door `cont`.
+
+You may also call functions with `+*` by making use of e.g. the `%~` rune.
+>
+    =<
+      |_  a=@
+      +*  do   ~(. +> a)
+      ++  stuff  foo:do
+    ::etc
+    --
+    |_  b=@
+    ++  foo  %bar
+    ::etc
+    --
+<
+
+==============================================================================
+COL                                                                  *col* *:*
+
+The `:` ("col") expressions are used to produce cells, which are pairs of
+values. E.g., `:-(p q)` produces the cell `[p q]`. All `:` runes reduce to
+`:-`.
+
+------------------------------------------------------------------------------
+COLHEP                                                           *colhep* *:-*
+
+Construct a cell (2-tuple).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    :-  p
+    q
+<
+Wide:
+>
+    :-(p q)
+<
+Irregular: #1>
+    [p q]
+<
+Irregular: #2>
+      p^q
+<
+AST~
+>
+    [%clhp p=hoon q=hoon]
+<
+Produces~
+
+The cell of `p` and `q`.
+
+Discussion~
+
+Hoon expressions actually use the same "autocons" pattern as Nock formulas. If
+you're assembling expressions (which usually only the compiler does), `[a b]`
+is the same as `:-(a b)`.
+
+Examples~
+>
+    > :-(1 2)
+    [1 2]
+    
+    ~zod:dojo> 1^2
+    [1 2]
+<
+
+------------------------------------------------------------------------------
+COLCAB                                                           *colcab* *:_*
+
+Construct a cell, inverted.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    :_  p
+    q
+<
+Wide:
+>
+    :_(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%clcb p=hoon q=hoon]
+<
+Expands to~
+>
+    :-(q p)
+<
+Examples~
+>
+    > :_(1 2)
+    [2 1]
+<
+
+------------------------------------------------------------------------------
+COLLUS                                                           *collus* *:+*
+
+Construct a triple (3-tuple).
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    :+  p
+      q
+    r
+<
+Wide:
+>
+    :+(p q r)
+<
+Irregular:
+>
+      [p q r]
+<
+AST~
+>
+    [%clls p=hoon q=hoon r=hoon]
+<
+Expands to:~
+>
+    :-(p :-(q r))
+<
+Examples~
+>
+    > :+  1
+        2
+      3
+    [1 2 3]
+    
+    > :+(%a ~ 'b')
+    [%a ~ 'b']
+<
+
+------------------------------------------------------------------------------
+COLKET                                                           *colket* *:^*
+
+Construct a quadruple (4-tuple).
+
+Syntax~
+
+Four arguments, fixed.
+
+Tall:
+>
+    :^    p
+        q
+      r
+    s
+<
+Wide:
+>
+    :^(p q r s)
+<
+Irregular:
+>
+      [p q r s]
+<
+AST~
+>
+    [%clkt p=hoon q=hoon r=hoon s=hoon]
+<
+Expands to~
+>
+    :-(p :-(q :-(r s)))
+<
+Examples~
+>
+    > :^(1 2 3 4)
+    [1 2 3 4]
+    
+    > :^    5
+          6
+        7
+      8
+    [5 6 7 8]
+<
+
+------------------------------------------------------------------------------
+COLTAR                                                           *coltar* `:*`
+
+Construct an n-tuple.
+
+Syntax~
+
+Variable number of arguments.
+
+Tall:
+>
+    :*  p1
+        p2
+        p3
+        pn
+    ==
+<
+Wide:
+>
+    :*(p1 p2 p3 pn)
+<
+Irregular:
+>
+      [p1 p2 p3 pn]
+<
+AST~
+>
+    [%cltr p=(list hoon)]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `p`:
+>
+    :-(a :-(b :-(c :-(... z)))))
+<
+Desugaring~
+>
+    |-
+    ?~  p
+      !!
+    ?~  t.p
+      i.p
+    :-  i.p
+    $(p t.p)
+<
+Examples~
+>
+    > :*(5 3 4 1 4 9 0 ~ 'a')
+    [5 3 4 1 4 9 0 ~ 'a']
+    
+    > [5 3 4 1 4 9 0 ~ 'a']
+    [5 3 4 1 4 9 0 ~ 'a']
+    
+    > :*  5
+          3
+          4
+          1
+          4
+          9
+          0
+          ~
+          'a'
+      ==
+    [5 3 4 1 4 9 0 ~ 'a']
+<
+
+------------------------------------------------------------------------------
+COLSIG                                                           *colsig* *:~*
+
+Construct a null-terminated list.
+
+Syntax~
+
+Variable number of arguments.
+
+Tall:
+>
+    :~  p1
+        p2
+        p3
+        pn
+    ==
+<
+Wide:
+>
+    :~(p1 p2 p3 pn)
+<
+Irregular:
+>
+      ~[p1 p2 p3 pn]
+<
+AST~
+>
+    [%clsg p=(list hoon)]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `p`:
+>
+    :-(a :-(b :-(c :-(... :-(z ~)))))
+<
+Desugaring~
+>
+    |-
+    ?~  p
+      ~
+    :-  i.p
+    $(p t.p)
+<
+Discussion~
+
+Note that this does not produce a `list` type, it just produces a null-
+terminated n-tuple. To make it a proper `list` it must be cast or molded.
+
+Examples~
+>
+    > :~(5 3 4 2 1)
+    [5 3 4 2 1 ~]
+    
+    > ~[5 3 4 2 1]
+    [5 3 4 2 1 ~]
+    
+    > :~  5
+          3
+          4
+          2
+          1
+      ==
+    [5 3 4 2 1 ~]
+<
+
+------------------------------------------------------------------------------
+COLCOL                                                           *colcol* *::*
+
+Code comment.
+
+Syntax~
+>
+    ::  any text you like!
+<
+Examples~
+>
+    ::
+    ::  this is commented code
+    ::
+    |=  a=@         ::  a gate
+    (add 2 a)       ::  that adds 2
+                    ::  to the input
+<
+
+==============================================================================
+CEN                                                                  *cen* *%*
+
+The `%` family of runes is used for making 'function calls' in Hoon. To be
+more precise, these runes evaluate the `$` arm in cores, usually after
+modifying the sample. (The default sample is replaced with the input values
+given in the call.)
+
+These runes reduce to the `%=` rune.
+
+------------------------------------------------------------------------------
+CENCAB                                                           *cencab* *%_*
+
+Resolve a wing with changes, preserving type.
+
+Syntax~
+
+One fixed argument, then a variable number of pairs.
+
+Tall: style #1>
+    %_  a=wing
+      b=wing  c=hoon
+      d=wing  e=hoon
+      f=wing  g=hoon
+    ==
+<
+Tall: style #2>
+    %_    a=wing
+        b=wing
+      c=hoon
+    ::
+        d=wing
+      e=hoon
+    ::
+        f=wing
+      g=hoon
+    ==
+<
+Wide:
+>
+    %_(a=wing b=wing c=hoon, d=wing e=hoon, ...)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%cncb p=wing q=(list (pair wing hoon))]
+<
+Expands to~
+>
+    ^+(a %=(a b c, d e, ...))
+<
+Semantics~
+
+A `%_` expression resolves to the value of the subject at wing `a`, but
+modified according to a series of changes: `b` is replaced with the product of
+`c`, `d` with the product of `e`, and so on. At compile time a type check is
+performed to ensure that the resulting value is of the same type as `a`.
+
+Discussion~
+
+`%_` is different from `%=` because `%=` can change the type of a wing with
+mutations. `%_` preserves the wing type.
+
+See how wings are resolved.
+
+Examples~
+>
+    > =foo [p=42 q=6]
+    
+    > foo(p %baz)
+    [p=%baz q=6]
+    
+    > foo(p [55 99])
+    [p=[55 99] q=6]
+    
+    > %_(foo p %baz)
+    [p=7.496.034 99]
+    
+    > %_(foo p [55 99])
+    ! nest-fail
+<
+
+------------------------------------------------------------------------------
+CENCOL                                                           *cencol* *%:*
+
+Call a gate with many arguments.
+
+Syntax~
+
+One fixed argument, then a variable number of arguments.
+
+Tall:
+>
+    %:  a=hoon
+      b=hoon
+      c=hoon
+       ...
+      d=hoon
+    ==
+<
+Wide:
+>
+    %:(a b c d)
+<
+Irregular:
+>
+      (a b c d)
+<
+AST~
+>
+    [%cncl p=hoon q=(list hoon)]
+<
+Semantics~
+
+A `%:` expression calls a gate with many arguments. `a` is the gate to be
+called, and `b` through `d` are the arguments. If there is only one
+subexpression after `a`, its product is the sample. Otherwise, a single
+argument is constructed by evaluating all of `b` through `d` -- however many
+subexpressions there are -- and putting the result in a cell: `[b c ... d]`.
+
+Discussion~
+
+When `%:` is used in tall-form syntax, the series of expressions after `p`
+must be terminated with `==`.
+
+Examples~
+>
+    > %:  add  22  33  ==
+    55
+    
+    > =adder |=  a=*
+             =+  c=0
+             |-
+             ?@  a  (add a c)
+             ?^  -.a  !!
+             $(c (add -.a c), a +.a)
+    
+    > %:  adder  22  33  44  ==
+    99
+    
+    > %:  adder  22  33  44  55  ==
+    154
+    
+    > %:(adder 22 33 44)
+    99
+    
+    > (adder 22 33 44)
+    99
+<
+
+------------------------------------------------------------------------------
+CENDOT                                                           *cendot* *%.*
+
+Call a gate (function), inverted.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    %.  a  b
+<
+Wide:
+>
+    %.(a b)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%cndt p=hoon q=hoon]
+<
+Semantics~
+
+The `%.` rune is for evaluating the `$` arm of a gate, i.e., calling a
+function. `a` is for the desired sample value (i.e., input value), and `b` is
+the gate.
+
+Expands to~
+>
+    %-(b=hoon a=hoon)
+<
+Discussion~
+
+`%.` is just like `%-`, but with its subexpressions reversed; the argument
+comes first, and then the gate.
+
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > %.([1 2 3] add-triple)
+    6
+<
+
+------------------------------------------------------------------------------
+CENHEP                                                           *cenhep* *%-*
+
+Call a gate (function).
+
+Syntax~
+
+Tall:
+>
+    %-  a
+    b
+<
+Wide:
+>
+    %-(a b)
+<
+Irregular:
+>
+      (a b)
+<
+AST~
+>
+    [%cnhp p=hoon q=hoon]
+<
+Semantics~
+
+This rune is for evaluating the `$` arm of a gate, i.e., calling a gate as a
+function. `a` is the gate, and `b` is the desired sample value (i.e., input
+value) for the gate.
+
+Expands to~
+>
+    %~($ a b)
+<
+Discussion~
+
+`%-` is used to call a function; `a` is the function (`gate`, `q` the
+argument. `%-` is a special case of `%~` ("censig"), and a gate is a special
+case of a door.
+
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > (add-triple 1 2 3)
+    6
+    
+    > %-(add-triple [1 2 3])
+    6
+<
+
+------------------------------------------------------------------------------
+CENKET                                                           *cenket* *%^*
+
+Call gate with triple sample.
+
+Syntax~
+
+Four arguments, fixed.
+
+Tall:
+>
+    %^    a
+        b
+      c
+    d
+<
+Wide:
+>
+    %^(a b c d)
+<
+Irregular:
+>
+      (a b c d)
+<
+AST~
+>
+    [%cnkt p=hoon q=hoon r=hoon s=hoon]
+<
+Expands to~
+>
+    %-(a=hoon [b=hoon c=hoon d=hoon])
+<
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > %^(add-triple 1 2 3)
+    6
+<
+
+------------------------------------------------------------------------------
+CENLUS                                                           *cenlus* *%+*
+
+Call gate with a cell sample.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    %+  a
+      b
+    c
+<
+Wide:
+>
+    %+(a b c)
+<
+Irregular:
+>
+      (a b c)
+<
+AST~
+>
+    [%cnls p=hoon q=hoon r=hoon]
+<
+Semantics~
+
+A `%+` expression is for calling a gate with a cell sample. `a` is the gate to
+be called, `b` is for the head of the sample, and `c` is for the sample tail.
+
+Expands to~
+>
+    %-(a=hoon [b=hoon c=hoon])
+<
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > %+(add-triple 1 [2 3])
+    6
+<
+
+------------------------------------------------------------------------------
+CENSIG                                                           *censig* *%~*
+
+Evaluate an arm in a door.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    %~  p  q
+    r
+<
+Wide:
+>
+    %~(p q r)
+<
+Irregular:
+>
+      ~(p q r1 r2 rn)
+<
+In the irregular form, `r` may be split into multiple parts. Multiple parts of
+`r` will be formed into a cell.
+
+Semantics~
+
+A `%~` expression evaluates the arm of a door (i.e., a core with a sample).
+`a` is a wing that resolves to the arm from within the door in question. `b`
+is the door itself. `c` is the sample of the door.
+
+Discussion~
+
+`%~` is the general case of a function call, `%-`. In both, we replace the
+sample (`+6`) of a core. In `%-` the core is a gate and the `$` arm is
+evaluated. In `%~` the core is a door and any arm may be evaluated. You must
+identify the arm to be run: `%~(arm door arg)`.
+
+See also `|_`.
+
+Examples~
+>
+    > =mycore |_  a=@
+              ++  plus-two  (add 2 a)
+              ++  double  (mul 2 a)
+              --
+    
+    > ~(plus-two mycore 10)
+    12
+    
+    > ~(double mycore 10)
+    20
+<
+
+------------------------------------------------------------------------------
+CENTAR                                                           *centar* `%*`
+
+Evaluate an expression, then resolve a wing with changes.
+
+Syntax~
+
+Two fixed arguments, then a variable number of pairs.
+
+Tall: style #1>
+    %*  a=wing  b=hoon
+      c=wing  d=hoon
+      e=wing  f=hoon
+           ...
+      g=wing  h=hoon
+    ==
+<
+Tall: style #2>
+    %*    a=wing  b=hoon
+        c=wing
+      d=hoon
+    ::
+        e=wing
+      f=hoon
+    ::
+        g=wing
+      h=hoon
+    ==
+<
+Wide:
+>
+    %*(a b c d, e f, g h)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%cntr p=wing q=hoon r=(list (pair wing hoon))]
+<
+Semantics~
+
+A `%*` expression evaluates some arbitrary Hoon expression, `b`, and then
+resolves a wing of that result, with changes. `a` is the wing to be resolved,
+and one or more changes is defined by the subexpressions after `b`.
+
+Expands to~
+>
+    =+  b=hoon
+    %=  a=wing
+      c=wing  d=hoon
+      e=wing  f=hoon
+           ...
+      g=wing  h=hoon
+    ==
+<
+Examples~
+>
+    > %*($ add a 2, b 3)
+    5
+    
+    > %*(b [a=[12 14] b=[c=12 d=44]] c 11)
+    [c=11 d=44]
+    
+    > %*(b [a=[12 14] b=[c=12 d=44]] c 11, d 33)
+    [c=11 d=33]
+    
+    > =foo [a=1 b=2 c=3 d=4]
+    
+    > %*(+ foo c %hello, d %world)
+    [b=2 c=%hello d=%world]
+    
+    > =+(foo=[a=1 b=2 c=3] foo(b 7, c 10))
+    [a=1 b=7 c=10]
+    
+    > %*(foo [foo=[a=1 b=2 c=3]] b 7, c 10)
+    [a=1 b=7 c=10]
+<
+
+------------------------------------------------------------------------------
+CENTIS                                                           *centis* *%=*
+
+Resolve a wing with changes.
+
+Syntax~
+
+One fixed argument, then a variable number of pairs.
+
+Tall: style #1>
+    %=  a=wing
+      b=wing  c=hoon
+      d=wing  e=hoon
+           ...
+      f=wing  g=hoon
+    ==
+<
+Tall: style #2>
+    %=    a=wing
+        b=wing
+      c=hoon
+    ::
+        d=wing
+      e=hoon
+    ::
+        f=wing
+      g=hoon
+    ==
+<
+Wide:
+>
+    %=(a b c, d e, f g)
+<
+Irregular:
+>
+      a(b c, d e, f g)
+<
+AST~
+>
+    [%cnts p=wing q=(list (pair wing hoon))]
+<
+Semantics~
+
+A `%=` expression resolves a wing of the subject, but with changes made.
+
+If `a` resolves to a leg, a series of changes are made to wings of that leg
+(`b`, `d`, and `f` above are replaced with the respective products of `c`,
+`e`, and `g` above). The modified leg is returned.
+
+If `a` resolves to an arm, a series of changes are made to wings of the parent
+core of that arm. (Again, `b`, `d`, and `f` are replaced with the respective
+products of `c`, `e`, and `g`.) The arm is computed with the modified core as
+the subject, and the product is returned.
+
+Discussion~
+
+Note that `a` is a wing, not just any expression. Knowing that a function call
+`(foo baz)` involves evaluating `foo`, replacing its sample at slot `+6` with
+`baz`, and then resolving to the `$` limb, you might think `(foo baz)` would
+mean `%=(foo +6 baz)`.
+
+But it's actually `=+(foo =>(%=(+2 +6 baz) $))`. Even if `foo` is a wing, we
+would just be mutating `+6` within the core that defines the `foo` arm.
+Instead we want to modify the product of `foo` -- the gate -- so we have to
+pin it into the subject.
+
+Here's that again in tall form:
+>
+    =+  foo
+    =>  %=  +2
+          +6  baz
+        ==
+      $
+<
+Examples~
+>
+    > =foo [p=5 q=6]
+    
+    > foo(p 42)
+    [p=42 q=6]
+    
+    > foo(+3 99)
+    [p=5 99]
+<
+
+==============================================================================
+KET                                                                  *ket* *^*
+
+`^-` ("kethep"), `^+` ("ketlus"), and `^=` ("kettis") let us adjust types
+without violating type constraints.
+
+The `nest` algorithm which tests subtyping is conservative; it never allows
+invalid nests, it sometimes rejects valid nests.
+
+------------------------------------------------------------------------------
+KETBAR                                                           *ketbar* *^|*
+
+Convert a gold core to an iron core (contravariant).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^|  p
+<
+Wide:
+>
+    ^|(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktbr p=hoon]
+<
+Produces~
+
+`p` as an iron core; crash if not a gold core.
+
+Discussion~
+
+An iron core is an opaque function (gate or door).
+
+Theorem: if type `x` nests within type `a`, and type `y` nests within type
+`b`, a core accepting `b` and producing `x` nests within a iron core accepting
+`y` and producing `a`.
+
+Informally, a function fits an interface if the function has a more specific
+result and/or a less specific argument than the interface.
+
+Examples~
+
+The prettyprinter shows the core metal (`.` gold, `|` iron):
+>
+    ~zod:dojo> |=(@ 1)
+    <1.gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+    
+    ~zod:dojo> ^|(|=(@ 1))
+    <1|gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+<
+
+------------------------------------------------------------------------------
+KETCOL                                                           *ketcol* *^:*
+
+Mold gate for type `p`.
+
+Note this rune is now redundant.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^:  p
+<
+Wide:
+>
+    ^:(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktcl p=spec]
+<
+Produces~
+
+A gate that returns the sample value if it's of the correct type, but crashes
+otherwise.
+
+Discussion~
+
+`^:` is used to produce a mold that crashes if its sample is of the wrong
+type.
+
+Molds used to produced their bunt value if they couldn't mold their sample.
+This is no longer the case: molds now crash if molding fails, so this rune is
+redundant.
+
+One may expect that `^:(path /foo)` would result in a syntax error since `^:`
+only takes one child, but instead it will parse as `=< ^ %:(path /foo)`. Since
+`:` is the irregular syntax for `=<` this is is parsed as "get `^` (i.e. the
+mold for cells) from a subject of `(path /foo)`", with `:` being the irregular
+syntax for `=<`.
+
+Examples~
+>
+    > ^:  @
+    < 1.goa
+      { *
+        {our/@p now/@da eny/@uvJ}
+        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
+      }
+    >
+    
+    > (^:(@) 22)
+    22
+    
+    > (^:(@) [22 33])
+    ford: %ride failed to execute:
+<
+
+------------------------------------------------------------------------------
+KETDOT                                                           *ketdot* *^.*
+
+Typecast on value produced by passing `q` to `p`.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^.  p
+    q
+<
+Wide:
+>
+    ^.(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktdt p=hoon q=hoon]
+<
+Expands to~
+>
+    ^+(%:(p q) q)
+<
+Discussion~
+
+`p` produces a gate and q is any Hoon expression.
+
+`^.` is particularly useful when `p` is a gate that 'cleans up' the type
+information about some piece of data. For example, `limo` is used to turn a
+raw noun of the appropriate shape into a genuine list. Hence we can use `^.`
+to cast with `limo` and similar gates, ensuring that the product has the
+desired type.
+
+Examples~
+>
+    > =mylist [11 22 33 ~]
+    
+    > ?~(mylist ~ i.mylist)
+    mint-vain
+    
+    > =mylist ^.(limo mylist)
+    
+    > ?~(mylist ~ i.mylist)
+    11
+    
+    > ?~(mylist ~ t.mylist)
+    ~[22 33]
+<
+
+------------------------------------------------------------------------------
+KETHEP                                                           *kethep* *^-*
+
+Typecast by explicit type label.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^-  p
+    q
+<
+Wide:
+>
+    ^-(p q)
+<
+Irregular:
+>
+      `p`q
+<
+AST~
+>
+    [%kthp p=spec q=hoon]
+<
+Expands to~
+>
+    ^+(^*(p) q)
+<
+Discussion~
+
+It's a good practice to put a `^-` ("kethep") at the top of every arm
+(including gates, loops, etc). This cast is strictly necessary only in the
+presence of head recursion (otherwise you'll get a `rest-loop` error, or if
+you really screw up spectacularly an infinite loop in the compiler).
+
+Examples~
+>
+    ~zod:dojo> (add 90 7)
+    97
+    
+    ~zod:dojo> `@t`(add 90 7)
+    'a'
+    
+    ~zod:dojo> ^-(@t (add 90 7))
+    'a'
+    
+    /~zod:dojo> =foo  |=  a=@tas
+                      ^-  (unit @ta)
+                      `a
+    
+    /~zod:dojo> (foo 97)
+    [~ ~.a]
+<
+------------------------------------------------------------------------------
+KETLUS                                                           *ketlus* *^+*
+
+Typecast by inferred type.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^+  p
+    q
+<
+Wide:
+>
+    ^+(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktls p=hoon q=hoon]
+<
+Produces~
+
+The value of `q` with the type of `p`, if the type of `q` nests within the
+type of `p`. Otherwise, `nest-fail`.
+
+Examples~
+>
+    ~zod:dojo> ^+('text' %a)
+    'a'
+<
+
+------------------------------------------------------------------------------
+KETPAM                                                           *ketpam* *^&*
+
+Convert a core to a zinc core (covariant).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^&  p
+<
+Wide:
+>
+    ^&(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktpm p=hoon]
+<
+Produces~
+
+`p` as a zinc core; crash if `p` isn't a gold or zinc core.
+
+Discussion~
+
+A zinc core has a read-only sample and an opaque context. See Advanced types.
+
+Examples~
+
+The prettyprinter shows the core metal in the arm labels `1.xoz` and `1&xoz`
+below (`.` is gold, `&` is zinc):
+>
+    > |=(@ 1)
+    < 1.xoz
+      { @
+        {our/@p now/@da eny/@uvJ}
+        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
+      }
+    >
+    
+    > ^&(|=(@ 1))
+    < 1&xoz
+      { @
+        {our/@p now/@da eny/@uvJ}
+        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
+      }
+    >
+<
+You can read from the sample of a zinc core, but not change it:
+>
+    > =mycore ^&(|=(a=@ 1))
+    
+    > a.mycore
+    0
+    
+    > mycore(a 22)
+    -tack.a
+    -find.a
+    ford: %slim failed:
+    ford: %ride failed to compute type:
+<
+
+------------------------------------------------------------------------------
+KETSIG                                                           *ketsig* *^~*
+
+Fold constant at compile time.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^~  p
+<
+Wide:
+>
+    ^~(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktsg p=hoon]
+<
+Produces~
+
+`p`, folded as a constant if possible.
+
+Examples~
+>
+    > (make '|-(42)')
+    [%8 p=[%1 p=[1 42]] q=[%9 p=2 q=[%0 p=1]]]
+    
+    > (make '^~(|-(42))')
+    [%1 p=42]
+<
+
+------------------------------------------------------------------------------
+KETTAR                                                           *kettar* `^*`
+
+Produce example type value.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^*  p
+<
+Wide:
+>
+    ^*(p)
+<
+Irregular:
+>
+      *p
+<
+`p` is any structure expression.
+
+AST~
+>
+    [%kttr p=spec]
+<
+Produces~
+
+A default value (i.e., 'bunt value') of the type `p`.
+
+Examples~
+
+Regular:
+>
+    > ^*  @
+    0
+    
+    > ^*  %baz
+    %baz
+    
+    > ^*  ^
+    [0 0]
+    
+    > ^*  ?
+    %.y
+<
+Irregular:
+>
+    > *@
+    0
+    
+    > *^
+    [0 0]
+    
+    > *tape
+    ""
+<
+
+------------------------------------------------------------------------------
+KETTIS                                                           *kettis* *^=*
+
+Bind name to a value.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^=  p
+    q
+<
+Wide:
+>
+    ^=(p q)
+<
+Irregular:
+>
+      p=q
+<
+AST~
+>
+    [%ktts p=skin q=hoon]
+<
+Produces~
+
+If `p` is a term, the product `q` with type `[%face p q]`. `p` may also be a
+tuple of terms, or a term-skin pair; the type of `q` must divide evenly into
+cells to match it.
+
+Examples~
+>
+    > a=1
+    a=1
+    
+    > ^=  a
+      1
+    a=1
+    
+    > ^=(a 1)
+    a=1
+    
+    > [b c d]=[1 2 3 4]
+    [b=1 c=2 d=[3 4]]
+    
+    > [b c d=[x y]]=[1 2 3 4]
+    [b=1 c=2 d=[x=3 y=4]]
+<
+
+------------------------------------------------------------------------------
+KETWUT                                                           *ketwut* *^?*
+
+Convert any core to a lead core (bivariant).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^?  p
+<
+Wide:
+>
+    ^?(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktwt p=hoon]
+<
+Produces~
+
+`p` as a lead core; crash if not a core.
+
+Discussion~
+
+A lead core is an opaque generator; the payload can't be read or written.
+
+Theorem: if type `x` nests within type `a`, a lead core producing `x` nests
+within a lead core producing `a`.
+
+Informally, a more specific generator can be used as a less specific
+generator.
+
+Examples~
+
+The prettyprinter shows the core metal (`.` gold, `?` lead):
+>
+    > |=(@ 1)
+    <1.gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+    
+    > ^?(|=(@ 1))
+    <1?gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+<
+
+==============================================================================
+BUC                                                                  *buc* *$*
+
+The `$` family of runes is used for defining custom types. Strictly speaking,
+these runes are used to produce `spec`s, which we call 'structures'.
+
+Overview~
+
+Structures are abstract syntax trees for `type`s (see the documentation on
+basic and advanced types for the precise definition of `type`). Structures are
+compile-time values of `type` which at runtime may be used to produce a
+'mold'.
+
+A mold is a function from nouns to nouns used to validate values of the type
+to which the structure defines. A mold can do two things at runtime. First, it
+may 'clam' a noun, which validates the shape of the noun to be one that fits
+the abstract syntax tree given by the `spec` that produced the mold. Failing
+this validation results in a crash. Secondly, a mold may also be used to
+produce an example value of the type to which is corresponds, called the 'bunt
+value'. The bunt value is used as a placeholder for sample values that may be
+passed to a gate that accepts the corresponding type.
+
+A correct mold is a normalizer: an idempotent function across all nouns. If
+the sample of a gate has type `%noun`, and its body obeys the constraint that
+for any x, `=((mold x) (mold (mold x)))`, it's a normalizer and can be used as
+a mold. Hoon is not dependently typed and so can't check idempotence
+statically, so we can't actually tell if a mold matches this definition
+perfectly. This is not actually a problem.
+
+In any case, since molds are just functions, we can use functional programming
+to assemble interesting molds. For instance, `(map foo bar)` is a table from
+mold `foo` to mold `bar`. `map` is not a mold; it's a function that makes a
+mold. Molds and mold builders are generally described together.
+
+`spec`s contain more information and draw finer distinctions than `type`s,
+which is to say that a given type may have more than one valid `spec` defining
+it, and thus downconversion from `spec` to `type` is lossy. Thus structure
+validation (done with `$|`, which is a more restrictive validation than that
+performed by molds, is a rare use case. Except for direct raw input, it's
+generally a faux pas to validate structure at runtime -- or even in userspace.
+Nonetheless they are sometimes utilized for types that will be more performant
+if they satisfy some validating gate.
+
+
+------------------------------------------------------------------------------
+BUCBAR                                                           *bucbar* *$|*
+
+Structure that satisfies a validator.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $|  p
+    q
+<
+Wide:
+>
+    $|(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%bcbr p=spec q=hoon]
+<
+Discussion~
+
+`$|` is used for validation of values at a finer level than that of types.
+Recall that a given value of `type` can be equivalently defined by more than
+one `spec`. For performance reasons, it may be beneficial to restrict oneself
+to values of a given type that adhere to an abstract syntax tree specified by
+some subset of those `spec`s that may be used to define a given type.
+
+`$|` takes two arguments: a structure `a` and a gate `b` that produces a
+`flag` that is used to validate values produced by the mold generated by `a`
+at runtime. `$|(a b)` is a gate that takes in a noun `x` and first pins the
+product of clamming `a` with `x`, call this `foo`. Then it calls `b` on `foo`.
+It asserts that the product of `(b foo)` is `&`, and then produces `foo`. This
+is equivalent to the following (which is not how `$|` is actually defined but
+has the same behavior):
+>
+    |=  x=*
+    =/  foo  ;;(a x)
+    ?>  (b foo)
+    foo
+<
+For example, the elements of a `set` are treated as being unordered, but the
+values will necessarily possess an order by where they are in the memory. Thus
+if every `set` is stored using the same order scheme then faster algorithms
+involving `set`s may be written. Furthermore, if you just place elements in
+the `set` randomly, it may be mistreated by algorithms already in place that
+are expecting a certain order. This is not the same thing as casting - it is
+forcing a type to have a more specific set of values than its mold would
+suggest. This rune should rarely be used, but it is extremely important when
+it is.
+
+Examples~
+>
+    > =foo $|  (list @)
+           |=(a=(list) (lth (lent a) 4))
+<
+This creates a structure `foo` whose values are `list`s with length less than
+4.
+>
+    > (foo ~[1 2 3])
+    ~[1 2 3]
+    
+    > (foo ~[1 2 3 4])
+    ford: %ride failed to execute:
+<
+The definition of `+set` in `hoon.hoon` is the following:
+>
+    ++  set
+      |$  [item]
+      $|  (tree item)
+      |=(a=(tree) ?:(=(~ a) & ~(apt in a)))
+<
+Here `|$` is used to define a mold builder that takes in a mold (given the
+face `item`) and creates a structure consisting of a `tree` of `item`s with
+`$|` that is validated with the gate `|=(a=(tree) ?:(=(~ a) & ~(apt in a)))`.
+`in` is a door in `hoon.hoon` with functions for handling `set`s, and `apt` is
+an arm in that door that checks that the values in the `tree` are arranged in
+the particular way that `set`s are arranged in Hoon, namely 'ascending `+mug`
+hash order'.
+
+
+------------------------------------------------------------------------------
+BUCCAB                                                           *buccab* *$_*
+
+Structure that normalizes to an example.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    $_  p
+<
+Wide:
+>
+    $_(p)
+<
+Irregular:
+>
+      _p
+<
+AST~
+>
+    [%bccb p=hoon]
+<
+Expands to~
+>
+    |=(* p)
+<
+Discussion~
+
+`$_` discards the sample it's supposedly normalizing and produces its example
+instead.
+
+Examples~
+>
+    > =foo $_([%foobaz %moobaz])
+    
+    > (foo %foo %baz)
+    [%foobaz %moobaz]
+    
+    > `foo`[%foobaz %moobaz]
+    [%foobaz %moobaz]
+    
+    > $:foo
+    [%foobaz %moobaz]
+<
+
+------------------------------------------------------------------------------
+BUCCEN                                                           *buccen* *$%*
+
+Structure which recognizes a union tagged by head atom.
+
+Syntax~
+
+A variable number of arguments.
+
+Tall:
+>
+    $%  [%p1 ...]
+        [%p2 ...]
+        [%p3 ...]
+        [%pn ...]
+    ==
+<
+Wide:
+>
+    $%([%p1 ...] [%p2 ...] [%p3 ...] [%pn ...])
+<
+Irregular:
+
+- None.
+
+
+Each item may be an atom or (more commonly) a cell. The atom or head of the
+cell must be a constant (`%foo`, `%1`, `%.y`, etc).
+
+AST~
+>
+    [%bccn p=(list spec)]
+<
+Defaults to~
+
+The default of the last item `i` in `p`. Crashes if `p` is empty.
+
+Discussion~
+
+A `$%` is a tagged union, a common data model.
+
+Make sure the last item in your `$%` terminates, or the default will be an
+infinite loop! Alteratively, you can use `$~` to define a custom type default
+value.
+
+Examples~
+>
+    > =foo $%([%foo p=@ud q=@ud] [%baz p=@ud])
+    
+    > (foo [%foo 4 2])
+    [%foo p=4 q=2]
+    
+    > (foo [%baz 37])
+    [%baz p=37]
+    
+    > $:foo
+    [%baz p=0]
+<
+
+------------------------------------------------------------------------------
+BUCCOL                                                           *buccol* *$:*
+
+Form a cell type.
+
+Syntax~
+
+A variable number of arguments.
+
+Tall:
+>
+    $:  p1
+        p2
+        p3
+        pn
+    ==
+<
+Wide:
+>
+    $:(p1 p2 p3 pn)
+<
+Irregular: (noun mode)>
+    ,[p1 p2 p3 pn]
+<
+Irregular: (structure mode)>
+      [p1 p2 p3 pn]
+<
+AST~
+>
+    [%bccl p=(list spec)]
+<
+Normalizes to~
+
+The tuple the length of `p`, normalizing each item.
+
+Defaults to~
+
+The tuple the length of `p`.
+
+Examples~
+>
+    > =foo $:(p=@ud q=@tas)
+    
+    > (foo 33 %foo)
+    [p=33 q=%foo]
+    
+    > `foo`[33 %foo]
+    [p=33 q=%foo]
+    
+    > $:foo
+    [p=0 q=%$]
+<
+
+------------------------------------------------------------------------------
+BUCGAL                                                           *bucgal* *$<*
+
+Filters a pre-existing mold to obtain a mold that excludes a particular
+structure.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $<  p
+    q
+<
+Wide:
+>
+    $<(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%bcgl p=spec q=spec]
+<
+Discussion~
+
+This can be used to obtain type(s) from a list of types `q` that do not
+satisfy a requirement given by `p`.
+
+Examples~
+>
+    > =foo $%([%bar p=@ud q=@ud] [%baz p=@ud])
+    
+    > =m $<(%bar foo)
+    
+    > (m [%bar 2 4])
+    ford: %ride failed to execute:
+    
+    > (m [%baz 2])
+    [%baz p=2]
+    
+    > ;;($<(%foo [@tas *]) [%foo 1])
+    ford: %ride failed to execute:
+    
+    > ;;($<(%foo [@tas *]) [%bar 1])
+    [%bar 1]
+<
+
+------------------------------------------------------------------------------
+BUCGAR                                                           *bucgar* *$>*
+
+Filters a mold to obtain a new mold matching a particular structure.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $>  p
+    q
+<
+Wide:
+>
+    $>(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%bcgr p=spec q=spec]
+<
+Discussion~
+
+This can be used to obtain type(s) from a list of types `q` that satisfy a
+requirement given by `p`.
+
+Examples~
+
+Examples with `$%`:
+>
+    > =foo $%([%bar p=@ud q=@ud] [%baz p=@ud])
+    
+    > =m $>(%bar foo)
+    
+    > (m [%bar 2 4])
+    [%bar p=2 q=4]
+    
+    > (m [%baz 2])
+    ford: %ride failed to execute:
+<
+Examples with `;;`:
+>
+    > ;;([@tas *] [%foo 1])
+    [%foo 1]
+    
+    > ;;([@tas *] [%bar 1])
+    [%bar 1]
+    
+    > ;;($>(%foo [@tas *]) [%foo 1])
+    [%foo 1]
+    
+    > ;;($>(%foo [@tas *]) [%bar 1])
+    ford: %ride failed to execute:
+<
+
+------------------------------------------------------------------------------
+BUCHEP                                                           *buchep* *$-*
+
+Structure that normalizes to an example gate.
+
+AST~
+>
+    [%bchp p=spec q=spec]
+<
+Expands to~
+>
+    $_  ^|
+    |=(p $:q)
+<
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $-  p
+    q
+<
+Wide:
+>
+    $-(p q)
+<
+Irregular:
+
+- None.
+
+
+`p` is the type the gate takes and `q` is the type the gate produces.
+
+Discussion~
+
+Since a `$-` reduces to a `$_`, it is not useful for normalizing, just for
+typechecking. In particular, the existence of `$-`s does not let us send gates
+or other cores over the network!
+
+Examples~
+>
+    > =foo $-(%foo %baz)
+    
+    > ($:foo %foo)
+    %baz
+<
+
+------------------------------------------------------------------------------
+BUCKET                                                           *bucket* *$^*
+
+Structure which normalizes a union tagged by head depth (cell).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $^  p
+    q
+<
+Wide:
+>
+    $^(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%bckt p=spec q=spec]
+<
+Normalizes to~
+
+Default, if the sample is an atom; `p`, if the head of the sample is an atom;
+`q` otherwise.
+
+Defaults to~
+
+The default of `p`.
+
+Examples~
+>
+    > =a $%([%foo p=@ud q=@ud] [%baz p=@ud])
+    
+    > =b $^([a a] a)
+    
+    > (b [[%baz 33] [%foo 19 22]])
+    [[%baz p=33] [%foo p=19 q=22]]
+    
+    > (b [%foo 19 22])
+    [%foo p=19 q=22]
+    
+    > $:b
+    [%baz p=0]
+<
+
+------------------------------------------------------------------------------
+BUCPAM                                                           *bucpam* *$&*
+
+Repair a value of a tagged union type.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $&  p
+    q
+<
+Wide:
+>
+    $&(p q)
+<
+Irregular:
+
+- None.
+
+>
+    $&(combined-mold=spec normalizing-gate=hoon)
+<
+Here `combined-mold` is a tagged union type (typically made with `$%`) and
+`normalizing-gate` is a gate which accepts values of `combined-mold` and
+normalizes them to be of one particular type in `combined-mold`.
+
+AST~
+>
+    [%bcpm p=spec q=hoon]
+<
+Normalizes to~
+
+The product of the normalizing gate and sample.
+
+Defaults to~
+
+The default of the last type listed in `p`, normalized with the normalizing
+gate.
+
+Discussion~
+
+This rune is used to "upgrade" or "repair" values of a structure, typically
+from an old version to a new version. For example, this may happen when
+migrating state after updating an app.
+
+Examples~
+>
+    +$  old  [%0 @]
+    +$  new  [%1 ^]
+    +$  combined  $%(old new)
+    +$  adapting  $&(combined |=(?-(-.a %0 [%1 1 +.a], %1 a)))
+<
+Here `adapting` is a structure that bunts to `[%1 ^]` but also normalizes from
+`[%0 @]` if called on such a noun.
+
+
+------------------------------------------------------------------------------
+BUCSIG                                                           *bucsig* *$~*
+
+Define a custom type default value.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $~  p
+    q
+<
+Wide:
+>
+    $~(p q)
+<
+Irregular:
+
+- None.
+
+
+`p` defines the default value, and `q` defines everything else about the
+structure.
+
+AST~
+>
+    [%bcsg p=hoon q=spec]
+<
+Product~
+
+Creates a structure (custom type) just like `q`, except its default value is
+`p`.
+
+Defaults to~
+
+The product of `p`.
+
+Discussion~
+
+You should make sure that the product type of `p` nests under `q`. You can
+check the default value of some structure (custom type) `r` with `*r`. (See
+the `^*` rune.)
+
+Do not confuse the `$~` rune with the constant type for null, `$~`. (The
+latter uses older Hoon syntax that is still accepted. Preferably it would be
+`%~`.)
+
+Examples~
+
+First, let's define a type without using `$~`:
+>
+    > =b $@(@tas $%([%two *] [%three *]))
+    
+    > `b`%hello
+    %hello
+    
+    > `b`[%two %hello]
+    [%two 478.560.413.032]
+    
+    > *b
+    
+    %$
+    
+    > *@tas
+    %$
+<
+Using `$~`:
+>
+    > =c $~(%default-value $@(@tas $%([%two *] [%three *])))
+    
+    > `c`%hello
+    %hello
+    
+    > `c`[%two %hello]
+    [%two 478.560.413.032]
+    
+    > *c
+    %default-value
+<
+
+------------------------------------------------------------------------------
+BUCPAT                                                           *bucpat* *$@*
+
+Structure which normalizes a union tagged by head depth (atom).
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $@  p
+    q
+<
+Wide:
+>
+    $@(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%bcpt p=spec q=spec]
+<
+Normalizes to~
+
+`p`, if the sample is an atom; `q`, if the sample is a cell.
+
+Defaults to~
+
+The default of `p`.
+
+Produces~
+
+A structure which applies `p` if its sample is an atom, `q` if its sample is a
+cell.
+
+Examples~
+>
+    > =a $@(%foo $:(p=%baz q=@ud))
+    
+    > (a %foo)
+    %foo
+    
+    > `a`[%baz 99]
+    [p=%baz q=99]
+    
+    > $:a
+    %foo
+<
+
+------------------------------------------------------------------------------
+BUCTIS                                                           *buctis* *$=*
+
+Structure which wraps a face around another structure.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    $=  p
+    q
+<
+Wide:
+>
+    $=(p q)
+<
+Irregular:
+>
+      p=q
+<
+AST~
+>
+    [%bcts p=skin q=spec]
+<
+Expands to~
+>
+    |=  *
+    ^=(p %-(q +6))
+<
+Discussion~
+
+Note that the Hoon compiler is at least slightly clever about compiling
+structures, and almost never has to actually put in a gate layer (as seen in
+the expansion above) to apply a `$=`.
+
+Examples~
+>
+    > =a $=(p %foo)
+    
+    > (a %foo)
+    p=%foo
+    
+    > (a %baz)
+    ford: %ride failed to execute:
+<
+
+------------------------------------------------------------------------------
+BUCWUT                                                           *bucwut* *$?*
+
+Form a type from a union of other types.
+
+Syntax~
+
+Variable number of arguments.
+
+Tall:
+>
+    $?  p1
+        p2
+        p3
+        pn
+    ==
+<
+Wide:
+>
+    $?(p1 p2 p3 pn)
+<
+Irregular:
+>
+      ?(p1 p2 p3 pn)
+<
+AST~
+>
+    [%bcwt p=(list spec)]
+<
+Normalizes to~
+
+The last item in `p` which normalizes the sample to itself.
+
+Void, if `p` is empty.
+
+Defaults to~
+
+The last item in `p`.
+
+Discussion~
+
+For a union of atoms, a `$?` is fine. For more complex nouns, always try to
+use a `$%`, `$@` or `$^`, at least if you expect your structure to be used as
+a normalizer.
+
+Examples~
+>
+    > =a ?(%foo %baz %baz)
+    
+    > (a %baz)
+    %baz
+    
+    > (a [37 45])
+    ford: %ride failed to execute:
+    
+    > $:a
+    %baz
+<
+
+==============================================================================
+MIC                                                                  *mic* *;*
+
+Miscellaneous useful macros.
+
+------------------------------------------------------------------------------
+MICCOL                                                           *miccol* *;:*
+
+Call a binary function as an n-ary function.
+
+Syntax~
+
+One fixed argument, then a variable number of arguments.
+
+Tall:
+>
+    ;:  p
+      q1
+      q2
+      qn
+    ==
+<
+Wide:
+>
+    ;:(p q1 q2 qn)
+<
+Irregular:
+>
+      :(p q1 q2 qn)
+<
+AST~
+>
+    [%mccl p=hoon q=(list hoon)]
+<
+Expands to~
+
+Pseudocode: `a`, `b`, `c`, ... as elements of `q`:
+
+Regular form:
+>
+    %-(p a %-(p b %-(p c ...)))
+<
+Irregular form:
+>
+    (p a (p b (p c ...)))
+<
+Desugaring~
+>
+    |-
+    ?~  q  !!
+    ?~  t.q  !!
+    ?~  t.t.q
+      (p i.q i.t.q)
+    (p i.q $(q t.q))
+<
+Examples~
+>
+    > (add 3 (add 4 5))
+    12
+    
+    > ;:(add 3 4 5)
+    12
+    
+    > :(add 3 4 5)
+    12
+    
+    > `@t`:((cury cat 3) 'a' 'b' 'c' 'd')
+    'abcd'
+<
+
+------------------------------------------------------------------------------
+MICGAL                                                           *micgal* *;<*
+
+Monadic do notation.
+
+Syntax~
+
+Four arguments, fixed.
+
+Tall:
+>
+    ;<  mold  bind  expr1  expr2
+<
+Wide:
+>
+    ;<(mold bind expr1 expr2)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%mcgl p=spec q=hoon r=hoon s=hoon]
+<
+Semantics~
+
+A `;<` is for sequencing two computations, `expr1` and `expr2`, using a
+provided implementation of monadic bind. This rune takes a gate `bind` which
+takes a mold `mold` and produces an implementation of monadic bind.
+
+Desugaring~
+>
+    %+  (bind mold)
+      expr1
+    |=  mold
+    expr2
+<
+Discussion~
+
+`;<` is much like Haskell `do` notation. You have a sequence of events you'd
+like to run such that each past the first depends on the output of the
+previous one. The output of the previous one may not be of the correct type to
+use as an input to the next one, and so an adapter such as `+biff` is needed.
+
+`;<` differs from `;~` in that it takes a gate which takes a mold that
+produces an implementation of monadic bind, rather than taking an
+implementation of monadic bind directly.
+
+`;<` can be used to glue a pipeline together to run an asynchronous function
+or event. This can be helpful when deferring parts of a computation based on
+external data.
+
+We remark that you can switch binds in the middle of a sequence of `;<`.
+
+Examples~
+
+`+biff` is the unit monad's implementation of monadic bind. That is to say, it
+takes a unit `a` and a gate `b` that accepts a noun that produces a unit, and
+extracts the value from `a` to pass as a sample to `b`.
+
+We illustrate the usage of `;<` with `+biff` with a `map` of atoms:
+>
+    > =m (my ~[[1 3] [2 2] [3 1]])
+    > (~(get by m) 1)
+    [~ 3]
+<
+A single usage of `;<` only serves to apply the binding function to the output
+of `expr1`:
+>
+    > ;<  a=@  _biff  (~(get by m) 1)
+      a
+    3
+<
+Here we see the result of chaining them together:
+>
+    > ;<  a=@  _biff  (~(get by m) 1)
+      ;<  b=@  _biff  (~(get by m) a)
+      b
+    1
+<
+
+------------------------------------------------------------------------------
+MICLUS                                                           *miclus* *;+*
+
+make a single XML node (Sail)
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ;+  p
+<
+Wide:
+>
+    ;+(p)
+<
+Irregular:
+
+- None.
+
+
+`p` is a Hoon expression that produces a `manx`.
+
+Produces~
+
+A `marl`, i.e., a list of `manx`. A `manx` is a noun that represents a single
+XML node.
+
+Discussion~
+
+tl;dr -- `;+` converts a `manx` to a `marl`.
+
+`;+` is a Sail rune. Sail is a part of Hoon used for creating and operating on
+nouns that represent XML nodes. With the appropriate rendering pipeline, a
+Sail document can be used to generate a static website.
+
+In Sail a single XML node is represented by a `manx`. A single Error: Inline
+HTML element to Vimdoc is not supported. <p&gt;Error: Inline HTML element to
+Vimdoc is not supported.  node `manx` can be produced in the following way:
+>
+    > ;p: This will be rendered as an XML node.
+    [[%p ~] [[%$ [%$ "This will be rendered as an XML node."] ~] ~] ~]
+<
+Sometimes what is needed is a `marl`, i.e., a list of `manx`. To convert a
+single `manx` to a `marl`, use the `;+` rune.
+
+One interesting thing about Sail is that it allows you to use complex Hoon
+expressions to choose from among several nodes to render. The `;+` rune can
+take such a complex expression.
+
+Examples~
+>
+    > ^-  marl
+      ;+  ?:  (gth 3 2)
+            ;p: This is the node for 'yes'.
+          ;p: This is the node for 'no'.
+    ~[
+      [ g=[n=%p a=~]
+        c=[i=[g=[n=%$ a=~[[n=%$ v="This is the node for 'yes'."]]] c=~] t=~]
+      ]
+    ]
+    
+    > ^-  marl
+      ;+  ?:  (gth 2 3)
+            ;p: This is the node for 'yes'.
+          ;p: This is the node for 'no'.
+    ~[
+      [ g=[n=%p a=~]
+        c=[i=[g=[n=%$ a=~[[n=%$ v="This is the node for 'no'."]]] c=~] t=~]
+      ]
+    ]
+<
+
+------------------------------------------------------------------------------
+MICMIC                                                           *micmic* *;;*
+
+Normalize with a mold, asserting fixpoint.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ;;  p
+    q
+<
+Wide:
+>
+    ;;(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%mcmc p=spec q=hoon]
+<
+Expands to~
+>
+    =+  a=(p q)
+    ?>  =(`*`a `*`q)
+    a
+<
+Note: the expansion implementation is hygienic -- it doesn't actually add the
+`a` face to the subject.
+
+
+Examples~
+
+Fails because of auras:
+>
+    > ^-(tape ~[97 98 99])
+    mint-nice
+    -need.?(%~ [i=@tD t=""])
+    -have.[@ud @ud @ud %~]
+    nest-fail
+    dojo: hoon expression failed
+<
+Succeeds because molds don't care about auras:
+>
+    > ;;(tape ~[97 98 99])
+    "abc"
+<
+Fails because not a fixpoint:
+>
+    > ;;(tape [50 51 52])
+    dojo: hoon expression failed
+<
+
+------------------------------------------------------------------------------
+MICFAS                                                           *micfas* *;/*
+
+Tape as XML element.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ;/  p
+<
+Wide:
+>
+    ;/(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%mcnt p=hoon]
+<
+Expands to~
+>
+    ~[%$ ~[%$ 'p']]
+<
+Examples~
+>
+    > ;/  "foo"
+    [[%~. [%~. "foo"] ~] ~]
+<
+
+------------------------------------------------------------------------------
+MICSIG                                                           *micsig* *;~*
+
+Glue a pipeline together with a product-sample adapter.
+
+Syntax~
+
+One fixed argument, then a variable number of arguments.
+
+Tall:
+>
+    ;~  p
+      q1
+      q2
+      qn
+    ==
+<
+Wide:
+>
+    ;~(p q1 q2 qn)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%mcsg p=hoon q=(list hoon)]
+<
+Produces~
+
+The gates in `q` are composed together using the gate `p` as an intermediate
+function, which transforms a `q` product and a `q` gate into a `q` sample.
+
+Expands to~
+
+Note: these are structurally correct, but elide some type-system complexity.
+
+`;~(a b)` reduces to `b`.
+
+`;~(a b c)` expands to
+>
+    |=  arg=*
+    (a (b arg) c(+6 arg))
+<
+`;~(a b c d)` expands to
+>
+    |=  arg=*
+    %+  a (b arg)
+    =+  arg=arg
+    |.  (a (c arg) d(+6 arg))
+<
+Desugaring~
+>
+    ?~  q  !!
+    |-
+    ?~  t.q  i.q
+    =/  a  $(q t.q)
+    =/  b  i.q
+    =/  c  ,.+6.b
+    |.  (p (b c) a(,.+6 c))
+<
+Discussion~
+
+Apparently `;~` is a "Kleisli arrow." It's also a close cousin of the infamous
+"monad." Don't let that bother you. Hoon doesn't know anything about category
+theory, so you don't need to either.
+
+`;~` is often used in parsers, but is not only for parsers.
+
+This can be thought of as user-defined function composition; instead of simply
+nesting the gates in `q`, each is passed individually to `p` with the product
+of the previous gate, allowing arbitrary filtering, transformation, or
+conditional application.
+
+Examples~
+
+A simple "parser." `trip` converts a `cord` (atomic string) to a `tape`
+(linked string).
+>
+    > =cmp |=([a=tape b=$-(char tape)] `tape`?~(a ~ (weld (b i.a) t.a)))
+    > ;~(cmp trip)
+    <1.zje {a/@ <409.yxa 110.lxv 1.ztu $151>}>
+<
+With just one gate in the pipeline `q`, the glue `p` is unused:
+>
+    > (;~(cmp trip) 'a')
+    "a"
+<
+But for multiple gates, we need it to connect the pipeline:
+>
+    > (;~(cmp trip |=(a=@ ~[a a])) 'a')
+    "aa"
+    
+    > (;~(cmp trip |=(a=@ ~[a a])) '')
+    ""
+<
+A more complicated example:
+>
+    > (;~(cmp trip ;~(cmp |=(a=@ ~[a a]) |=(a=@ <(dec a)>))) 'b')
+    "97b"
+    
+    > (;~(cmp trip |=(a=@ ~[a a]) |=(a=@ <(dec a)>)) 'b')
+    "97b"
+    
+    > (;~(cmp trip |=(a=@ ~[a a]) |=(a=@ <(dec a)>)) '')
+    ""
+    
+    > (;~(cmp trip |=(a=@ ~[a a]) |=(a=@ <(dec a)>)) 'a')
+    "96a"
+    
+    > (;~(cmp trip |=(a=@ ~[a a]) |=(a=@ <(dec a)>)) 'acd')
+    "96acd"
+<
+
+------------------------------------------------------------------------------
+MICTAR                                                           *mictar* `;*`
+
+make a list of XML nodes from complex Hoon expression (Sail)
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ;*  p
+<
+Wide:
+>
+    ;*(p)
+<
+Irregular:
+
+- None.
+
+
+`p` is a Hoon expression that produces a `marl`.
+
+Produces~
+
+A `marl`, i.e., a list of `manx`. A `manx` is a noun that represents a single
+XML node.
+
+Discussion~
+
+`;*` is a Sail rune. Sail is a part of Hoon used for creating and operating on
+nouns that represent XML nodes. With the appropriate rendering pipeline, a
+Sail document can be used to generate a static website.
+
+If you need a complex Hoon expression to produce a `marl`, use the `;*` rune.
+Often this rune is used with an expression, `p`, that includes one or more
+`;=` subexpressions.
+
+(See also `;=`.)
+
+Examples~
+>
+    > ;*  ?:  (gth 3 2)
+            ;=  ;p: This is node 1 of 'yes'.
+                ;p: This is node 2 of 'yes'.
+            ==
+          ;=  ;p: This is node 1 of 'no'.
+              ;p: This is node 2 of 'no'.
+          ==
+    [ [[%p ~] [[%$ [%$ "This is node 1 of 'yes'."] ~] ~] ~]
+      [[[%p ~] [[%$ [%$ "This is node 2 of 'yes'."] ~] ~] ~] ~]
+    ]
+    
+    > ;*  ?:  (gth 2 3)
+              ;=  ;p: This is node 1 of 'yes'.
+                  ;p: This is node 2 of 'yes'.
+              ==
+            ;=  ;p: This is node 1 of 'no'.
+                ;p: This is node 2 of 'no'.
+            ==
+    [ [[%p ~] [[%$ [%$ "This is node 1 of 'no'."] ~] ~] ~]
+      [[[%p ~] [[%$ [%$ "This is node 2 of 'no'."] ~] ~] ~] ~]
+    ]
+<
+
+------------------------------------------------------------------------------
+MICTIS                                                           *mictis* *;=*
+
+make a list of XML nodes (Sail)
+
+Syntax~
+
+A variable number of arguments.
+
+Tall:
+>
+    ;=  p1
+        p2
+        p3
+       pn
+    ==
+<
+Wide:
+>
+    ;=(p1 p2 p3 pn)
+<
+Irregular:
+
+- None.
+
+
+`p1`-`pn` are Hoon expressions, each of which poduces a `manx`.
+
+Produces~
+
+A `marl`, i.e., a list of `manx`. A `manx` is a noun that represents a single
+XML node.
+
+Discussion~
+
+`;=` is a Sail rune. Sail is a part of Hoon used for creating and operating on
+nouns that represent XML nodes. With the appropriate rendering pipeline, a
+Sail document can be used to generate a static website.
+
+In Sail a single XML node is represented by a `manx`. A single `<p>` node
+`manx` can be produced in the following way:
+>
+    > ;p: This will be rendered as an XML node.
+    [[%p ~] [[%$ [%$ "This will be rendered as an XML node."] ~] ~] ~]
+<
+Sometimes what is needed is a `marl`, i.e., a list of `manx`. To convert a
+series of `manx` nodes to a `marl`, use the `;=` rune.
+
+(See also `;*`.)
+
+Examples~
+>
+    > ;=  ;p: This is the first node.
+          ;p: This is the second.
+          ;p: Here is the last one.
+      ==
+    [ [[%p ~] [[%$ [%$ "This is the first node."] ~] ~] ~]
+      [[%p ~] [[%$ [%$ "This is the second."] ~] ~] ~]
+      [[%p ~] [[%$ [%$ "Here is the last one."] ~] ~] ~]
+      ~
+    ]
+<
+
+==============================================================================
+SIG                                                                  *sig* *~*
+
+Runes that use Nock `11` to pass non-semantic info to the interpreter. A
+mnemonic to remember what sig runes are for is "we're signaling some
+information to the interpreter".
+
+------------------------------------------------------------------------------
+SIGGAR                                                           *siggar* *~>*
+
+Raw hint, applied to computation.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~>  p
+    q
+<
+Wide:
+>
+    ~>(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sggr p=$@(term [p=term q=hoon]) q=hoon]
+<
+Expands to~
+
+`q`.
+
+Semantics~
+
+`p` may either be a single `%term` or a pair of `[term hoon]`, the latter of
+which may optionally be be written `%foo.some-hoon`. `p` will be passed to the
+interpreter and `q` will be evaluated and its result produced like normal.
+
+Discussion~
+
+Hoon has no way of telling what hints are used and what aren't. Hints are all
+conventions at the interpreter level.
+
+Examples~
+>
+    > ~>(%a 42)
+    42
+<
+Running the compiler:
+>
+    > (make '~>(%a 42)')
+    [%11 p=97 q=[%1 p=42]]
+    
+    > (make '~>(%a.+(2) 42)')
+    [%11 p=[p=97 q=[%4 p=[%1 p=2]]] q=[%1 p=42]]
+<
+
+------------------------------------------------------------------------------
+SIGBAR                                                           *sigbar* *~|*
+
+Tracing printf.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~|  p
+    q
+<
+Wide:
+>
+    ~|(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgbr p=hoon q=hoon]
+<
+Expands to~
+
+`q`.
+
+Convention~
+
+Prettyprints `p` in stack trace if `q` crashes.
+
+Examples~
+>
+    > ~|('sample error message' !!)
+    'sample error message'
+    dojo: hoon expression failed
+    
+    > ~|  'sample error message'
+      !!
+    'sample error message'
+    dojo: hoon expression failed
+<
+
+------------------------------------------------------------------------------
+SIGBUC                                                           *sigbuc* *~$*
+
+Profiling hit counter.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~&  p
+    q
+<
+Wide:
+>
+    ~&(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgbc p=term q=hoon]
+<
+Expands to~
+
+`q`.
+
+Discussion~
+
+If profiling is on, adds 1 to the hit counter `p`, which is a `term` like
+`%foo`. Profiling is enabled by passing the `-P` flag to the `urbit` binary.
+Profiling results are saved in
+`/path/to/pier/.urb/put/profile/~some.date.txt`.
+
+Examples~
+>
+    > ~$(%foo 3)
+    3
+<
+Assuming we have the binary running with the `-P` flag, if we do this:
+>
+    > =z |=  a=@
+         ?:  =(a 0)
+           a
+         ~$  %my-hit-counter
+         $(a (dec a))
+    
+    > (z 42)
+    0
+<
+...then look in `/path/to/pier/.urb/put/profile/~some.date.txt`, we'll see
+this line near the top of the file:
+>
+    my-hit-counter: 42
+<
+
+------------------------------------------------------------------------------
+SIGCAB                                                           *sigcab* *~_*
+
+User-formatted tracing printf.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~_  p
+    q
+<
+Wide:
+>
+    ~_(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgcb p=hoon q=hoon]
+<
+Expands to~
+
+`q`.
+
+Convention~
+
+Shows `p` in stacktrace if `q` crashes.
+
+Discussion~
+
+`p` must produce a `tank` (pretty-print source).
+
+Examples~
+>
+    > ~_([%leaf "sample error message"] !!)
+    sample error message
+    dojo: hoon expression failed
+    
+    > ~_  [%leaf "sample error message"]
+      !!
+    sample error message
+    dojo: hoon expression failed
+<
+
+------------------------------------------------------------------------------
+SIGCEN                                                           *sigcen* *~%*
+
+Jet registration.
+
+Syntax~
+
+Four arguments. Two fixed arguments, then a third which may be `~` if empty or
+else a variable number of pairs sandwiched between two `==`s, then a fourth
+fixed argument.
+
+Tall:
+>
+    ~%  p  q
+      ==
+        r1a  r1b
+        r2a  r2b
+        rna  rnb
+      ==
+    s
+<
+Wide:
+
+- None.
+
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgcn p=chum q=hoon r=tyre s=hoon]
+<
+Expands to~
+
+`s`.
+
+Convention~
+
+Register a core with name `p`, with parent at leg `q`, exporting the named
+formulas `r`, constructed by `s`.
+
+Discussion~
+
+`~%` is for registering cores. A registered core declares its formal identity
+to the interpreter, which may or may not be able to recognize and/or
+accelerate it.
+
+Registered cores are organized in a containment hierarchy. The parent core is
+at any leg within the child core. When we register a core, we state the leg to
+its parent, in the form of wing `q`. We assume the parent is already
+registered -- as it must be, if (a) we registered it on creation, (b) the
+child was created by an arm defined on the parent.
+
+(Cores are actually managed by their formula/battery. Any function call will
+create a new core with a new sample, but batteries are constant. But it is not
+sufficient to match the battery -- matching the semantics constrains the
+payload as well, since the semantics of a battery may depend on any parent
+core and/or payload constant.)
+
+The purpose of registration is always performance-related. It may involve (a)
+a special-purpose optimizer or "jet", written for a specific core and checked
+with a Merkle hash; (b) a general-purpose hotspot optimizer or "JIT"; or (c)
+merely a hotspot declaration for profiling.
+
+As always with hints, the programmer has no idea which of (a), (b), and (c)
+will be applied. Use `~%` indiscriminately on all hotspots, bottlenecks, etc,
+real or suspected.
+
+The list `r` is a way for the Hoon programmer to help jet implementors with
+named Nock formulas that act on the core. In complex systems, jet
+implementations are often partial and want to call back into userspace.
+
+The child core contains the parent, of course. When we register a core, we
+state the leg to its parent, in the form of wing `q`. We assume that the
+parent -- any core within the payload -- is already registered.
+
+`p` is the name of this core within its parent; `q` is a the leg
+
+Registers a jet in core `s` so that it can be called when that code is run.
+
+Examples~
+
+Here's the beginning of the AES core in `zuse.hoon`:
+>
+    ++  aes    !.
+      ~%  %aes  ..part  ~
+      |%
+      ++  ahem
+        |=  [nnk=@ nnb=@ nnr=@]
+        =>
+          =+  =>  [gr=(ga 8 0x11b 3) few==>(fe .(a 5))]
+              [pro=pro.gr dif=dif.gr pow=pow.gr ror=ror.few]
+          =>  |%
+      ..........
+<
+Here we label the entire `++aes` core for optimization.
+
+
+------------------------------------------------------------------------------
+SIGGAL                                                           *siggal* *~<*
+
+Raw hint, applied to product.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~<  p
+    q
+<
+Wide:
+>
+    ~<(p q)
+<
+Irregular:
+
+- None.
+
+
+`p` may either be a a `term` or a pair of `[term hoon]`. If it's the latter,
+`p` may optionally be written as `%foo.some-hoon`.
+
+AST~
+>
+    [%sggl p=$@(term [p=term q=hoon]) q=hoon]
+<
+Expands to~
+
+`q`.
+
+Discussion~
+
+`~<` is only used for jet hints (`~/` and `~%`) at the moment; we are not
+telling the interpreter something about the computation we're about to
+perform, but rather about its product.
+
+Examples~
+>
+    > (make '~<(%a 42)')
+    [%7 p=[%1 p=42] q=[%11 p=97 q=[%0 p=1]]]
+    > (make '~<(%a.+(.) 42)')
+    [%7 p=[%1 p=42] q=[%11 p=[p=97 q=[%4 p=[%0 p=1]]] q=[%0 p=1]]]
+<
+
+------------------------------------------------------------------------------
+SIGLUS                                                           *siglus* *~+*
+
+Cache a computation.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ~+  p
+<
+Wide:
+>
+    ~+(p)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgls p=hoon]
+<
+Expands to~
+
+`p`.
+
+Convention~
+
+Caches the formula and subject of `p` in a local cache (generally transient in
+the current event).
+
+Examples~
+
+This may pause for a second:
+>
+    > %.(25 |=(a=@ ?:((lth a 2) 1 (add $(a (sub a 2)) $(a (dec a))))))
+    121.393
+<
+This may make you want to press `ctrl-c`:
+>
+    > %.(30 |=(a=@ ?:((lth a 2) 1 (add $(a (sub a 2)) $(a (dec a))))))
+    1.346.269
+<
+This should work fine:
+>
+    > %.(100 |=(a=@ ~+(?:((lth a 2) 1 (add $(a (sub a 2)) $(a (dec a)))))))
+    573.147.844.013.817.084.101
+<
+
+------------------------------------------------------------------------------
+SIGFAS                                                           *sigfas* *~/*
+
+Jet registration for gate with registered context.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~/  p
+    q
+<
+Wide:
+>
+    ~/(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgfs p=term q=hoon]
+<
+Expands to~
+>
+    ~%(p +7 ~ q)
+<
+Examples~
+
+From the kernel:
+>
+    ++  add
+      ~/  %add
+      |=  [a=@ b=@]
+      ^-  @
+      ?:  =(0 a)  b
+      $(a (dec a), b +(b))
+<
+
+------------------------------------------------------------------------------
+SIGPAM                                                           *sigpam* *~&*
+
+Debugging printf.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~&  p
+    q
+<
+Wide:
+>
+    ~&(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgpm p=hoon q=hoon]
+<
+Expands to~
+
+`q`.
+
+Product~
+
+Pretty-prints `p` on the console before computing `q`.
+
+Discussion~
+
+This rune has no semantic effect beyond the Hoon expression `q`. It's used
+solely to create a side-effect: printing the value of `p` to the console.
+
+It's most useful for debugging programs.
+
+Examples~
+>
+    > ~&('halp' ~)
+    'halp'
+    ~
+    
+    > ~&  'halp'
+      ~
+    'halp'
+    ~
+<
+
+------------------------------------------------------------------------------
+SIGTIS                                                           *sigtis* *~=*
+
+Detect duplicate.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~=  p
+    q
+<
+Wide:
+>
+    ~=(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgts p=hoon q=hoon]
+<
+Expands to~
+
+`q`.
+
+Convention~
+
+If `p` equals `q`, produce `p` instead of `q`.
+
+Discussion~
+
+Duplicate nouns are especially bad news in Hoon, because comparing them takes
+O(n) time. Use `~=` to avoid this inefficiency.
+
+Examples~
+
+This code traverses a tree and replaces all instances of `32` with `320`:
+>
+    > =foo |=  a=(tree)
+           ?~(a ~ ~=(a [?:(=(n.a 32) 320 n.a) $(a l.a) $(a r.a)]))
+    
+    > (foo 32 ~ ~)
+    [320 ~ ~]
+<
+Without `~=`, it would build a copy of a completely unchanged tree. Sad!
+
+
+------------------------------------------------------------------------------
+SIGWUT                                                           *sigwut* *~?*
+
+Conditional debug printf.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    ~?  p
+      q
+    r
+<
+Wide:
+>
+    ~?(p q r)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgwt p=hoon q=hoon r=hoon]
+<
+Expands to~
+
+`r`.
+
+Convention~
+
+If `p` is true, prettyprints `q` on the console before computing `r`.
+
+Examples~
+>
+    > ~?((gth 1 2) 'oops' ~)
+    ~
+    
+    > ~?((gth 1 0) 'oops' ~)
+    'oops'
+    ~
+    
+    > ~?  (gth 1 2)
+        'oops'
+      ~
+    ~
+    
+    > ~?  (gth 1 0)
+        'oops'
+      ~
+    'oops'
+    ~
+<
+
+------------------------------------------------------------------------------
+SIGZAP                                                           *sigzap* *~!*
+
+Print type on compilation fail.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ~!  p
+    q
+<
+Wide:
+>
+    ~!(p q)
+<
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%sgzp p=hoon q=hoon]
+<
+Expands to~
+
+`q`.
+
+Convention~
+
+If compilation of `q` fails, prints the type of `p` in the trace.
+
+Examples~
+>
+    > a
+    ! -find.a
+    
+    > ~!('foo' a)
+    ! @t
+    ! find.a
+    
+    > ~!  'foo'
+      a
+    ! @t
+    ! find.a
+<
+
+==============================================================================
+==                                                                  *==* *and*
+
+The `--` and `==` are used as terminators: `--` for core expressions, and `==`
+for terminating a 'running' or 'jogging' series of Hoon expressions.
+
+------------------------------------------------------------------------------
+HEPHEP                                                           *hephep* *--*
+
+Syntax~
+
+The `--` rune is used to indicate the end of a core expression.
+
+Discussion~
+
+The `|%`, `|_`, and `|^` runes are used to create cores that can have
+arbitrarily many arms. When you have defined all the desired arms in a core
+expression (using the `++`, `+$`, and `+*` runes), use `--` to terminate the
+expression.
+
+Examples~
+>
+    > =num |%
+             ++  two  2
+             ++  add-two  |=(a=@ (add 2 a))
+             ++  double  |=(a=@ (mul 2 a))
+           --
+    
+    > two.num
+    2
+    
+    > (add-two.num 12)
+    14
+    
+    > (double.num 12)
+    24
+<
+
+------------------------------------------------------------------------------
+TISTIS                                                           *tistis* *==*
+
+Syntax~
+
+The `==` rune is used to indicate the end of a 'jogging' or 'running' series
+of Hoon expressions (runes that take a variable number of arguments).
+
+Discussion~
+
+Certain runes are used to create expressions that may include arbitrarily many
+subexpressions. Such expressions are terminated with the `==` rune. For
+example, the `:*` and `:~` runes are used to create a cell of any length. (The
+latter is just like the former except that it adds a null value at the end of
+the cell.) For another example, the `%=` rune used used to make arbitrarily
+many changes to a given wing value.
+
+Examples~
+>
+    > :*  2
+          3
+          4
+          5
+          6
+      ==
+    [2 3 4 5 6]
+    
+    > :~  2
+          3
+          4
+          5
+          6
+      ==
+    [2 3 4 5 6 ~]
+    
+    > =values [a=12 b=14 c=16 d=18 e=20]
+    
+    > %=  values
+        a  13
+        b  15
+        c  17
+        d  19
+        e  21
+      ==
+    [a=13 b=15 c=17 d=19 e=21]
+<
