@@ -32,8 +32,9 @@ not work. Use `help buctis` instead.
 
 The content is based on the [developers.urbit.org repository](https://github.com/urbit/developers.urbit.org/tree/main/content/reference/hoon/rune).
 The only changes made to the content has been the removal of markdown links and reformatting of custom From/Syntax tables.
-The syntax has been changed from markdown to Vim helptext (Vimdoc) using
-[`decipher`](https://git.sr.ht/~talfus-laddus/decipher) tool on the Markdown source files.
+The syntax has been changed from markdown to Vim helptext (Vimdoc) with [`decipher`](https://git.sr.ht/~talfus-laddus/decipher).
+
+See also [hoon-stdlib.vim](https://git.sr.ht/~talfus-laddus/hoon-stdlib.vim)
 
 Reach out to `~talfus-laddus` on Urbit for anything related to this plugin.
 
