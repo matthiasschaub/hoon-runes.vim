@@ -7,7 +7,7 @@
 Author: ~talfus-laddus
 Repository: https://git.sr.ht/~matthias_schaub/hoon-runes.vim
 License: MIT License
-Updated: 2023-04-01
+Updated: 2023-05-11
 
 Runes are a way to form expressions in Hoon.
 
@@ -5886,1218 +5886,6 @@ Examples~
 
 
 ==============================================================================
-CALLS                                                                        *Calls* *·*
-
-The `%` family of runes is used for making 'function calls' in Hoon. To be
-more precise, these runes evaluate the `$` arm in cores, usually after
-modifying the sample. (The default sample is replaced with the input values
-given in the call.)
-
-These runes reduce to the `%=` rune.
-
-------------------------------------------------------------------------------
-CENCAB                                                                 *cencab* *%_*
-
-Resolve a wing with changes, preserving type.
-
-Syntax~
-
-One fixed argument, then a variable number of pairs.
-
-Tall: style #1>
-    %_  a=wing
-      b=wing  c=hoon
-      d=wing  e=hoon
-      f=wing  g=hoon
-    ==
-<
-
-Tall: style #2>
-    %_    a=wing
-        b=wing
-      c=hoon
-    ::
-        d=wing
-      e=hoon
-    ::
-        f=wing
-      g=hoon
-    ==
-<
-
-Wide:
->
-    %_(a=wing b=wing c=hoon, d=wing e=hoon, ...)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%cncb p=wing q=(list (pair wing hoon))]
-<
-
-Expands to~
->
-    ^+(a %=(a b c, d e, ...))
-<
-
-Semantics~
-
-A `%_` expression resolves to the value of the subject at wing `a`, but
-modified according to a series of changes: `b` is replaced with the product of
-`c`, `d` with the product of `e`, and so on. At compile time a type check is
-performed to ensure that the resulting value is of the same type as `a`.
-
-Discussion~
-
-`%_` is different from `%=` because `%=` can change the type of a wing with
-mutations. `%_` preserves the wing type.
-
-See how wings are resolved.
-
-Examples~
->
-    > =foo [p=42 q=6]
-    
-    > foo(p %baz)
-    [p=%baz q=6]
-    
-    > foo(p [55 99])
-    [p=[55 99] q=6]
-    
-    > %_(foo p %baz)
-    [p=7.496.034 99]
-    
-    > %_(foo p [55 99])
-    ! nest-fail
-<
-
-
-------------------------------------------------------------------------------
-CENCOL                                                                 *cencol* *%:*
-
-Call a gate with many arguments.
-
-Syntax~
-
-One fixed argument, then a variable number of arguments.
-
-Tall:
->
-    %:  a=hoon
-      b=hoon
-      c=hoon
-       ...
-      d=hoon
-    ==
-<
-
-Wide:
->
-    %:(a b c d)
-<
-
-Irregular:
->
-      (a b c d)
-<
-
-AST~
->
-    [%cncl p=hoon q=(list hoon)]
-<
-
-Semantics~
-
-A `%:` expression calls a gate with many arguments. `a` is the gate to be
-called, and `b` through `d` are the arguments. If there is only one
-subexpression after `a`, its product is the sample. Otherwise, a single
-argument is constructed by evaluating all of `b` through `d` -- however many
-subexpressions there are -- and putting the result in a cell: `[b c ... d]`.
-
-Discussion~
-
-When `%:` is used in tall-form syntax, the series of expressions after `p`
-must be terminated with `==`.
-
-Examples~
->
-    > %:  add  22  33  ==
-    55
-    
-    > =adder |=  a=*
-             =+  c=0
-             |-
-             ?@  a  (add a c)
-             ?^  -.a  !!
-             $(c (add -.a c), a +.a)
-    
-    > %:  adder  22  33  44  ==
-    99
-    
-    > %:  adder  22  33  44  55  ==
-    154
-    
-    > %:(adder 22 33 44)
-    99
-    
-    > (adder 22 33 44)
-    99
-<
-
-
-------------------------------------------------------------------------------
-CENDOT                                                                 *cendot* *%.*
-
-Call a gate (function), inverted.
-
-Syntax~
-
-Two arguments, fixed.
-
-Tall:
->
-    %.  a  b
-<
-
-Wide:
->
-    %.(a b)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%cndt p=hoon q=hoon]
-<
-
-Semantics~
-
-The `%.` rune is for evaluating the `$` arm of a gate, i.e., calling a
-function. `a` is for the desired sample value (i.e., input value), and `b` is
-the gate.
-
-Expands to~
->
-    %-(b=hoon a=hoon)
-<
-
-Discussion~
-
-`%.` is just like `%-`, but with its subexpressions reversed; the argument
-comes first, and then the gate.
-
-Examples~
->
-    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
-    
-    > %.([1 2 3] add-triple)
-    6
-<
-
-
-------------------------------------------------------------------------------
-CENHEP                                                                 *cenhep* *%-*
-
-Call a gate (function).
-
-Syntax~
-
-Tall:
->
-    %-  a
-    b
-<
-
-Wide:
->
-    %-(a b)
-<
-
-Irregular:
->
-      (a b)
-<
-
-AST~
->
-    [%cnhp p=hoon q=hoon]
-<
-
-Semantics~
-
-This rune is for evaluating the `$` arm of a gate, i.e., calling a gate as a
-function. `a` is the gate, and `b` is the desired sample value (i.e., input
-value) for the gate.
-
-Expands to~
->
-    %~($ a b)
-<
-
-Discussion~
-
-`%-` is used to call a function; `a` is the function (`gate`, `q` the
-argument. `%-` is a special case of `%~` ("censig"), and a gate is a special
-case of a door.
-
-Examples~
->
-    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
-    
-    > (add-triple 1 2 3)
-    6
-    
-    > %-(add-triple [1 2 3])
-    6
-<
-
-
-------------------------------------------------------------------------------
-CENKET                                                                 *cenket* *%^*
-
-Call gate with triple sample.
-
-Syntax~
-
-Four arguments, fixed.
-
-Tall:
->
-    %^    a
-        b
-      c
-    d
-<
-
-Wide:
->
-    %^(a b c d)
-<
-
-Irregular:
->
-      (a b c d)
-<
-
-AST~
->
-    [%cnkt p=hoon q=hoon r=hoon s=hoon]
-<
-
-Expands to~
->
-    %-(a=hoon [b=hoon c=hoon d=hoon])
-<
-
-Examples~
->
-    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
-    
-    > %^(add-triple 1 2 3)
-    6
-<
-
-
-------------------------------------------------------------------------------
-CENLUS                                                                 *cenlus* *%+*
-
-Call gate with a cell sample.
-
-Syntax~
-
-Three arguments, fixed.
-
-Tall:
->
-    %+  a
-      b
-    c
-<
-
-Wide:
->
-    %+(a b c)
-<
-
-Irregular:
->
-      (a b c)
-<
-
-AST~
->
-    [%cnls p=hoon q=hoon r=hoon]
-<
-
-Semantics~
-
-A `%+` expression is for calling a gate with a cell sample. `a` is the gate to
-be called, `b` is for the head of the sample, and `c` is for the sample tail.
-
-Expands to~
->
-    %-(a=hoon [b=hoon c=hoon])
-<
-
-Examples~
->
-    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
-    
-    > %+(add-triple 1 [2 3])
-    6
-<
-
-
-------------------------------------------------------------------------------
-CENSIG                                                                 *censig* *%~*
-
-Evaluate an arm in a door.
-
-Syntax~
-
-Three arguments, fixed.
-
-Tall:
->
-    %~  p=wing  q=hoon
-    r=hoon
-<
-
-Wide:
->
-    %~(p q r)
-<
-
-Irregular:
->
-      ~(p q r1 r2 rn)
-<
-
-In the irregular form, `r` may be split into multiple parts. Multiple parts of
-`r` will be formed into a cell.
-
-Semantics~
-
-A `%~` expression evaluates the arm of a door (i.e., a core with a sample).
-`a` is a wing that resolves to the arm from within the door in question. `b`
-is the door itself. `c` is the sample of the door.
-
-Discussion~
-
-`%~` is the general case of a function call, `%-`. In both, we replace the
-sample (`+6`) of a core. In `%-` the core is a gate and the `$` arm is
-evaluated. In `%~` the core is a door and any arm may be evaluated. You must
-identify the arm to be run: `%~(arm door arg)`.
-
-Note also that `p` is a wing and can therefore be `.`, as in `~(. door
-sample)`. This little idiom lets you load your sample into the door once
-instead of over and over.
-
-See also `|_`.
-
-Examples~
->
-    > =mycore |_  a=@
-              ++  plus-two  (add 2 a)
-              ++  double  (mul 2 a)
-              ++  mul-by
-                |=  b=@
-                (mul a b)
-              --
-    
-    > ~(plus-two mycore 10)
-    12
-    
-    > ~(double mycore 10)
-    20
-    
-    >  =tencore ~(. mycore 10)
-    >  (mul-by:tencore 5)
-    50
-<
-
-
-------------------------------------------------------------------------------
-CENTAR                                                                 *centar* `%*`
-
-Evaluate an expression, then resolve a wing with changes.
-
-Syntax~
-
-Two fixed arguments, then a variable number of pairs.
-
-Tall: style #1>
-    %*  a=wing  b=hoon
-      c=wing  d=hoon
-      e=wing  f=hoon
-           ...
-      g=wing  h=hoon
-    ==
-<
-
-Tall: style #2>
-    %*    a=wing  b=hoon
-        c=wing
-      d=hoon
-    ::
-        e=wing
-      f=hoon
-    ::
-        g=wing
-      h=hoon
-    ==
-<
-
-Wide:
->
-    %*(a b c d, e f, g h)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%cntr p=wing q=hoon r=(list (pair wing hoon))]
-<
-
-Semantics~
-
-A `%*` expression evaluates some arbitrary Hoon expression, `b`, and then
-resolves a wing of that result, with changes. `a` is the wing to be resolved,
-and one or more changes is defined by the subexpressions after `b`.
-
-Expands to~
->
-    =+  b=hoon
-    %=  a=wing
-      c=wing  d=hoon
-      e=wing  f=hoon
-           ...
-      g=wing  h=hoon
-    ==
-<
-
-Examples~
->
-    > %*($ add a 2, b 3)
-    5
-    
-    > %*(b [a=[12 14] b=[c=12 d=44]] c 11)
-    [c=11 d=44]
-    
-    > %*(b [a=[12 14] b=[c=12 d=44]] c 11, d 33)
-    [c=11 d=33]
-    
-    > =foo [a=1 b=2 c=3 d=4]
-    
-    > %*(+ foo c %hello, d %world)
-    [b=2 c=%hello d=%world]
-    
-    > =+(foo=[a=1 b=2 c=3] foo(b 7, c 10))
-    [a=1 b=7 c=10]
-    
-    > %*(foo [foo=[a=1 b=2 c=3]] b 7, c 10)
-    [a=1 b=7 c=10]
-<
-
-
-------------------------------------------------------------------------------
-CENTIS                                                                 *centis* *%=*
-
-Resolve a wing with changes.
-
-Syntax~
-
-One fixed argument, then a variable number of pairs.
-
-Tall: style #1>
-    %=  a=wing
-      b=wing  c=hoon
-      d=wing  e=hoon
-           ...
-      f=wing  g=hoon
-    ==
-<
-
-Tall: style #2>
-    %=    a=wing
-        b=wing
-      c=hoon
-    ::
-        d=wing
-      e=hoon
-    ::
-        f=wing
-      g=hoon
-    ==
-<
-
-Wide:
->
-    %=(a b c, d e, f g)
-<
-
-Irregular:
->
-      a(b c, d e, f g)
-<
-
-AST~
->
-    [%cnts p=wing q=(list (pair wing hoon))]
-<
-
-Semantics~
-
-A `%=` expression resolves a wing of the subject, but with changes made.
-
-If `a` resolves to a leg, a series of changes are made to wings of that leg
-(`b`, `d`, and `f` above are replaced with the respective products of `c`,
-`e`, and `g` above). The modified leg is returned.
-
-If `a` resolves to an arm, a series of changes are made to wings of the parent
-core of that arm. (Again, `b`, `d`, and `f` are replaced with the respective
-products of `c`, `e`, and `g`.) The arm is computed with the modified core as
-the subject, and the product is returned.
-
-Discussion~
-
-Note that `a` is a wing, not just any expression. Knowing that a function call
-`(foo baz)` involves evaluating `foo`, replacing its sample at slot `+6` with
-`baz`, and then resolving to the `$` limb, you might think `(foo baz)` would
-mean `%=(foo +6 baz)`.
-
-But it's actually `=+(foo =>(%=(+2 +6 baz) $))`. Even if `foo` is a wing, we
-would just be mutating `+6` within the core that defines the `foo` arm.
-Instead we want to modify the product of `foo` -- the gate -- so we have to
-pin it into the subject.
-
-Here's that again in tall form:
->
-    =+  foo
-    =>  %=  +2
-          +6  baz
-        ==
-      $
-<
-
-Examples~
->
-    > =foo [p=5 q=6]
-    
-    > foo(p 42)
-    [p=42 q=6]
-    
-    > foo(+3 99)
-    [p=5 99]
-<
-
-
-==============================================================================
-CASTS                                                                        *Casts* *·*
-
-`^-` ("kethep"), `^+` ("ketlus"), and `^=` ("kettis") let us adjust types
-without violating type constraints.
-
-The `nest` algorithm which tests subtyping is conservative; it never allows
-invalid nests, it sometimes rejects valid nests.
-
-------------------------------------------------------------------------------
-KETBAR                                                                 *ketbar* *^|*
-
-Convert a gold core to an iron core (contravariant).
-
-Syntax~
-
-One argument, fixed.
-
-Tall:
->
-    ^|  p
-<
-
-Wide:
->
-    ^|(p)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%ktbr p=hoon]
-<
-
-Produces~
-
-`p` as an iron core; crash if not a gold core.
-
-Discussion~
-
-An iron core is an opaque function (gate or door).
-
-Theorem: if type `x` nests within type `a`, and type `y` nests within type
-`b`, a core accepting `b` and producing `x` nests within a iron core accepting
-`y` and producing `a`.
-
-Informally, a function fits an interface if the function has a more specific
-result and/or a less specific argument than the interface.
-
-Examples~
-
-The prettyprinter shows the core metal (`.` gold, `|` iron):
->
-    ~zod:dojo> |=(@ 1)
-    <1.gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
-    
-    ~zod:dojo> ^|(|=(@ 1))
-    <1|gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
-<
-
-
-------------------------------------------------------------------------------
-KETCOL                                                                 *ketcol* *^:*
-
-Mold gate for type `p`.
-
-Note this rune is now redundant.
-
-Syntax~
-
-One argument, fixed.
-
-Tall:
->
-    ^:  p
-<
-
-Wide:
->
-    ^:(p)
-<
-
-Irregular:
->
-    ,p
-<
-
-AST~
->
-    [%ktcl p=spec]
-<
-
-Produces~
-
-A gate that returns the sample value if it's of the correct type, but crashes
-otherwise.
-
-Discussion~
-
-`^:` is used to produce a mold that crashes if its sample is of the wrong
-type.
-
-Molds used to produced their bunt value if they couldn't mold their sample.
-This is no longer the case: molds now crash if molding fails, so this rune is
-redundant.
-
-One may expect that `^:(path /foo)` would result in a syntax error since `^:`
-only takes one child, but instead it will parse as `=< ^ %:(path /foo)`. Since
-`:` is the irregular syntax for `=<` this is is parsed as "get `^` (i.e. the
-mold for cells) from a subject of `(path /foo)`", with `:` being the irregular
-syntax for `=<`.
-
-Examples~
->
-    > ^:  @
-    < 1.goa
-      { *
-        {our/@p now/@da eny/@uvJ}
-        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
-      }
-    >
-    
-    > (^:(@) 22)
-    22
-    
-    > (^:(@) [22 33])
-    ford: %ride failed to execute:
-<
-
-
-------------------------------------------------------------------------------
-KETDOT                                                                 *ketdot* *^.*
-
-Typecast on value produced by passing `q` to `p`.
-
-Syntax~
-
-Two arguments, fixed.
-
-Tall:
->
-    ^.  p
-    q
-<
-
-Wide:
->
-    ^.(p q)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%ktdt p=hoon q=hoon]
-<
-
-Expands to~
->
-    ^+(%:(p q) q)
-<
-
-Discussion~
-
-`p` produces a gate and q is any Hoon expression.
-
-`^.` is particularly useful when `p` is a gate that 'cleans up' the type
-information about some piece of data. For example, `limo` is used to turn a
-raw noun of the appropriate shape into a genuine list. Hence we can use `^.`
-to cast with `limo` and similar gates, ensuring that the product has the
-desired type.
-
-Examples~
->
-    > =mylist [11 22 33 ~]
-    
-    > ?~(mylist ~ i.mylist)
-    mint-vain
-    
-    > =mylist ^.(limo mylist)
-    
-    > ?~(mylist ~ i.mylist)
-    11
-    
-    > ?~(mylist ~ t.mylist)
-    ~[22 33]
-<
-
-
-------------------------------------------------------------------------------
-KETHEP                                                                 *kethep* *^-*
-
-Typecast by explicit type label.
-
-Syntax~
-
-Two arguments, fixed.
-
-Tall:
->
-    ^-  p
-    q
-<
-
-Wide:
->
-    ^-(p q)
-<
-
-Irregular:
->
-      `p`q
-<
-
-AST~
->
-    [%kthp p=spec q=hoon]
-<
-
-Expands to~
->
-    ^+(^*(p) q)
-<
-
-Discussion~
-
-It's a good practice to put a `^-` ("kethep") at the top of every arm
-(including gates, loops, etc). This cast is strictly necessary only in the
-presence of head recursion (otherwise you'll get a `rest-loop` error, or if
-you really screw up spectacularly an infinite loop in the compiler).
-
-Examples~
->
-    ~zod:dojo> (add 90 7)
-    97
-    
-    ~zod:dojo> `@t`(add 90 7)
-    'a'
-    
-    ~zod:dojo> ^-(@t (add 90 7))
-    'a'
-    
-    /~zod:dojo> =foo |=  a=@
-                     ^-  (unit @ta)
-                     `a
-    
-    /~zod:dojo> (foo 97)
-    [~ ~.a]
-<
-
-------------------------------------------------------------------------------
-KETLUS                                                                 *ketlus* *^+*
-
-Typecast by inferred type.
-
-Syntax~
-
-Two arguments, fixed.
-
-Tall:
->
-    ^+  p
-    q
-<
-
-Wide:
->
-    ^+(p q)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%ktls p=hoon q=hoon]
-<
-
-Produces~
-
-The value of `q` with the type of `p`, if the type of `q` nests within the
-type of `p`. Otherwise, `nest-fail`.
-
-Examples~
->
-    ~zod:dojo> ^+('text' %a)
-    'a'
-<
-
-
-------------------------------------------------------------------------------
-KETPAM                                                                 *ketpam* *^&*
-
-Convert a core to a zinc core (covariant).
-
-Syntax~
-
-One argument, fixed.
-
-Tall:
->
-    ^&  p
-<
-
-Wide:
->
-    ^&(p)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%ktpm p=hoon]
-<
-
-Produces~
-
-`p` as a zinc core; crash if `p` isn't a gold or zinc core.
-
-Discussion~
-
-A zinc core has a read-only sample and an opaque context. See Advanced types.
-
-Examples~
-
-The prettyprinter shows the core metal in the arm labels `1.xoz` and `1&xoz`
-below (`.` is gold, `&` is zinc):
->
-    > |=(@ 1)
-    < 1.xoz
-      { @
-        {our/@p now/@da eny/@uvJ}
-        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
-      }
-    >
-    
-    > ^&(|=(@ 1))
-    < 1&xoz
-      { @
-        {our/@p now/@da eny/@uvJ}
-        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
-      }
-    >
-<
-
-You can read from the sample of a zinc core, but not change it:
->
-    > =mycore ^&(|=(a=@ 1))
-    
-    > a.mycore
-    0
-    
-    > mycore(a 22)
-    -tack.a
-    -find.a
-    ford: %slim failed:
-    ford: %ride failed to compute type:
-<
-
-
-------------------------------------------------------------------------------
-KETSIG                                                                 *ketsig* *^~*
-
-Fold constant at compile time.
-
-Syntax~
-
-One argument, fixed.
-
-Tall:
->
-    ^~  p
-<
-
-Wide:
->
-    ^~(p)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%ktsg p=hoon]
-<
-
-Produces~
-
-`p`, folded as a constant if possible.
-
-Examples~
->
-    > (make '|-(42)')
-    [%8 p=[%1 p=[1 42]] q=[%9 p=2 q=[%0 p=1]]]
-    
-    > (make '^~(|-(42))')
-    [%1 p=42]
-<
-
-
-------------------------------------------------------------------------------
-KETTAR                                                                 *kettar* `^*`
-
-Produce example type value.
-
-Syntax~
-
-One argument, fixed.
-
-Tall:
->
-    ^*  p
-<
-
-Wide:
->
-    ^*(p)
-<
-
-Irregular:
->
-      *p
-<
-
-`p` is any structure expression.
-
-AST~
->
-    [%kttr p=spec]
-<
-
-Produces~
-
-A default value (i.e., 'bunt value') of the type `p`.
-
-Examples~
-
-Regular:
->
-    > ^*  @
-    0
-    
-    > ^*  %baz
-    %baz
-    
-    > ^*  ^
-    [0 0]
-    
-    > ^*  ?
-    %.y
-<
-
-Irregular:
->
-    > *@
-    0
-    
-    > *^
-    [0 0]
-    
-    > *tape
-    ""
-<
-
-
-------------------------------------------------------------------------------
-KETTIS                                                                 *kettis* *^=*
-
-Bind name to a value.
-
-Syntax~
-
-Two arguments, fixed.
-
-Tall:
->
-    ^=  p
-    q
-<
-
-Wide:
->
-    ^=(p q)
-<
-
-Irregular:
->
-      p=q
-<
-
-AST~
->
-    [%ktts p=skin q=hoon]
-<
-
-Produces~
-
-If `p` is a term, the product `q` with type `[%face p q]`. `p` may also be a
-tuple of terms, or a term-skin pair; the type of `q` must divide evenly into
-cells to match it.
-
-Examples~
->
-    > a=1
-    a=1
-    
-    > ^=  a
-      1
-    a=1
-    
-    > ^=(a 1)
-    a=1
-    
-    > [b c d]=[1 2 3 4]
-    [b=1 c=2 d=[3 4]]
-    
-    > [b c d=[x y]]=[1 2 3 4]
-    [b=1 c=2 d=[x=3 y=4]]
-<
-
-
-------------------------------------------------------------------------------
-KETWUT                                                                 *ketwut* *^?*
-
-Convert any core to a lead core (bivariant).
-
-Syntax~
-
-One argument, fixed.
-
-Tall:
->
-    ^?  p
-<
-
-Wide:
->
-    ^?(p)
-<
-
-Irregular:
-
-- None.
-
-
-AST~
->
-    [%ktwt p=hoon]
-<
-
-Produces~
-
-`p` as a lead core; crash if not a core.
-
-Discussion~
-
-A lead core is an opaque generator; the payload can't be read or written.
-
-Theorem: if type `x` nests within type `a`, a lead core producing `x` nests
-within a lead core producing `a`.
-
-Informally, a more specific generator can be used as a less specific
-generator.
-
-Examples~
-
-The prettyprinter shows the core metal (`.` gold, `?` lead):
->
-    > |=(@ 1)
-    <1.gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
-    
-    > ^?(|=(@ 1))
-    <1?gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
-<
-
-
-==============================================================================
 SUBJECT                                                                        *Subject* *·*
 
 These runes modify the subject. (Or more precisely, they evaluate at least one
@@ -7968,4 +6756,1228 @@ Examples~
     
     > =?(a =(1 2) 22 a)
     12
+<
+
+
+==============================================================================
+CALLS                                                                        *Calls* *·*
+
+The `%` family of runes is used for making 'function calls' in Hoon. To be
+more precise, these runes evaluate the `$` arm in cores, usually after
+modifying the sample. (The default sample is replaced with the input values
+given in the call.)
+
+These runes reduce to the `%=` rune.
+
+------------------------------------------------------------------------------
+CENCAB                                                                 *cencab* *%_*
+
+Resolve a wing with changes, preserving type.
+
+Syntax~
+
+One fixed argument, then a variable number of pairs.
+
+Tall: style #1>
+    %_  a=wing
+      b=wing  c=hoon
+      d=wing  e=hoon
+      f=wing  g=hoon
+    ==
+<
+
+Tall: style #2>
+    %_    a=wing
+        b=wing
+      c=hoon
+    ::
+        d=wing
+      e=hoon
+    ::
+        f=wing
+      g=hoon
+    ==
+<
+
+Wide:
+>
+    %_(a=wing b=wing c=hoon, d=wing e=hoon, ...)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%cncb p=wing q=(list (pair wing hoon))]
+<
+
+Expands to~
+>
+    ^+(a %=(a b c, d e, ...))
+<
+
+Semantics~
+
+A `%_` expression resolves to the value of the subject at wing `a`, but
+modified according to a series of changes: `b` is replaced with the product of
+`c`, `d` with the product of `e`, and so on. At compile time a type check is
+performed to ensure that the resulting value is of the same type as `a`.
+
+Discussion~
+
+`%_` is different from `%=` because `%=` can change the type of a wing with
+mutations. `%_` preserves the wing type.
+
+See how wings are resolved.
+
+Examples~
+>
+    > =foo [p=42 q=6]
+    
+    > foo(p %baz)
+    [p=%baz q=6]
+    
+    > foo(p [55 99])
+    [p=[55 99] q=6]
+    
+    > %_(foo p %baz)
+    [p=7.496.034 99]
+    
+    > %_(foo p [55 99])
+    ! nest-fail
+<
+
+
+------------------------------------------------------------------------------
+CENCOL                                                                 *cencol* *%:*
+
+Call a gate with many arguments.
+
+Syntax~
+
+One fixed argument, then a variable number of arguments.
+
+Tall:
+>
+    %:  a=hoon
+      b=hoon
+      c=hoon
+       ...
+      d=hoon
+    ==
+<
+
+Wide:
+>
+    %:(a b c d)
+<
+
+Irregular:
+>
+      (a b c d)
+<
+
+AST~
+>
+    [%cncl p=hoon q=(list hoon)]
+<
+
+Semantics~
+
+A `%:` expression calls a gate with many arguments. `a` is the gate to be
+called, and `b` through `d` are the arguments. If there is only one
+subexpression after `a`, its product is the sample. Otherwise, a single
+argument is constructed by evaluating all of `b` through `d` -- however many
+subexpressions there are -- and putting the result in a cell: `[b c ... d]`.
+
+Discussion~
+
+When `%:` is used in tall-form syntax, the series of expressions after `p`
+must be terminated with `==`.
+
+Examples~
+>
+    > %:  add  22  33  ==
+    55
+    
+    > =adder |=  a=*
+             =+  c=0
+             |-
+             ?@  a  (add a c)
+             ?^  -.a  !!
+             $(c (add -.a c), a +.a)
+    
+    > %:  adder  22  33  44  ==
+    99
+    
+    > %:  adder  22  33  44  55  ==
+    154
+    
+    > %:(adder 22 33 44)
+    99
+    
+    > (adder 22 33 44)
+    99
+<
+
+
+------------------------------------------------------------------------------
+CENDOT                                                                 *cendot* *%.*
+
+Call a gate (function), inverted.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    %.  a  b
+<
+
+Wide:
+>
+    %.(a b)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%cndt p=hoon q=hoon]
+<
+
+Semantics~
+
+The `%.` rune is for evaluating the `$` arm of a gate, i.e., calling a
+function. `a` is for the desired sample value (i.e., input value), and `b` is
+the gate.
+
+Expands to~
+>
+    %-(b=hoon a=hoon)
+<
+
+Discussion~
+
+`%.` is just like `%-`, but with its subexpressions reversed; the argument
+comes first, and then the gate.
+
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > %.([1 2 3] add-triple)
+    6
+<
+
+
+------------------------------------------------------------------------------
+CENHEP                                                                 *cenhep* *%-*
+
+Call a gate (function).
+
+Syntax~
+
+Tall:
+>
+    %-  a
+    b
+<
+
+Wide:
+>
+    %-(a b)
+<
+
+Irregular:
+>
+      (a b)
+<
+
+AST~
+>
+    [%cnhp p=hoon q=hoon]
+<
+
+Semantics~
+
+This rune is for evaluating the `$` arm of a gate, i.e., calling a gate as a
+function. `a` is the gate, and `b` is the desired sample value (i.e., input
+value) for the gate.
+
+Expands to~
+>
+    %~($ a b)
+<
+
+Discussion~
+
+`%-` is used to call a function; `a` is the function (`gate`, `q` the
+argument. `%-` is a special case of `%~` ("censig"), and a gate is a special
+case of a door.
+
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > (add-triple 1 2 3)
+    6
+    
+    > %-(add-triple [1 2 3])
+    6
+<
+
+
+------------------------------------------------------------------------------
+CENKET                                                                 *cenket* *%^*
+
+Call gate with triple sample.
+
+Syntax~
+
+Four arguments, fixed.
+
+Tall:
+>
+    %^    a
+        b
+      c
+    d
+<
+
+Wide:
+>
+    %^(a b c d)
+<
+
+Irregular:
+>
+      (a b c d)
+<
+
+AST~
+>
+    [%cnkt p=hoon q=hoon r=hoon s=hoon]
+<
+
+Expands to~
+>
+    %-(a=hoon [b=hoon c=hoon d=hoon])
+<
+
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > %^(add-triple 1 2 3)
+    6
+<
+
+
+------------------------------------------------------------------------------
+CENLUS                                                                 *cenlus* *%+*
+
+Call gate with a cell sample.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    %+  a
+      b
+    c
+<
+
+Wide:
+>
+    %+(a b c)
+<
+
+Irregular:
+>
+      (a b c)
+<
+
+AST~
+>
+    [%cnls p=hoon q=hoon r=hoon]
+<
+
+Semantics~
+
+A `%+` expression is for calling a gate with a cell sample. `a` is the gate to
+be called, `b` is for the head of the sample, and `c` is for the sample tail.
+
+Expands to~
+>
+    %-(a=hoon [b=hoon c=hoon])
+<
+
+Examples~
+>
+    > =add-triple |=([a=@ b=@ c=@] :(add a b c))
+    
+    > %+(add-triple 1 [2 3])
+    6
+<
+
+
+------------------------------------------------------------------------------
+CENSIG                                                                 *censig* *%~*
+
+Evaluate an arm in a door.
+
+Syntax~
+
+Three arguments, fixed.
+
+Tall:
+>
+    %~  p=wing  q=hoon
+    r=hoon
+<
+
+Wide:
+>
+    %~(p q r)
+<
+
+Irregular:
+>
+      ~(p q r1 r2 rn)
+<
+
+In the irregular form, `r` may be split into multiple parts. Multiple parts of
+`r` will be formed into a cell.
+
+Semantics~
+
+A `%~` expression evaluates the arm of a door (i.e., a core with a sample).
+`a` is a wing that resolves to the arm from within the door in question. `b`
+is the door itself. `c` is the sample of the door.
+
+Discussion~
+
+`%~` is the general case of a function call, `%-`. In both, we replace the
+sample (`+6`) of a core. In `%-` the core is a gate and the `$` arm is
+evaluated. In `%~` the core is a door and any arm may be evaluated. You must
+identify the arm to be run: `%~(arm door arg)`.
+
+Note also that `p` is a wing and can therefore be `.`, as in `~(. door
+sample)`. This little idiom lets you load your sample into the door once
+instead of over and over.
+
+See also `|_`.
+
+Examples~
+>
+    > =mycore |_  a=@
+              ++  plus-two  (add 2 a)
+              ++  double  (mul 2 a)
+              ++  mul-by
+                |=  b=@
+                (mul a b)
+              --
+    
+    > ~(plus-two mycore 10)
+    12
+    
+    > ~(double mycore 10)
+    20
+    
+    >  =tencore ~(. mycore 10)
+    >  (mul-by:tencore 5)
+    50
+<
+
+
+------------------------------------------------------------------------------
+CENTAR                                                                 *centar* `%*`
+
+Evaluate an expression, then resolve a wing with changes.
+
+Syntax~
+
+Two fixed arguments, then a variable number of pairs.
+
+Tall: style #1>
+    %*  a=wing  b=hoon
+      c=wing  d=hoon
+      e=wing  f=hoon
+           ...
+      g=wing  h=hoon
+    ==
+<
+
+Tall: style #2>
+    %*    a=wing  b=hoon
+        c=wing
+      d=hoon
+    ::
+        e=wing
+      f=hoon
+    ::
+        g=wing
+      h=hoon
+    ==
+<
+
+Wide:
+>
+    %*(a b c d, e f, g h)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%cntr p=wing q=hoon r=(list (pair wing hoon))]
+<
+
+Semantics~
+
+A `%*` expression evaluates some arbitrary Hoon expression, `b`, and then
+resolves a wing of that result, with changes. `a` is the wing to be resolved,
+and one or more changes is defined by the subexpressions after `b`.
+
+Expands to~
+>
+    =+  b=hoon
+    %=  a=wing
+      c=wing  d=hoon
+      e=wing  f=hoon
+           ...
+      g=wing  h=hoon
+    ==
+<
+
+Examples~
+>
+    > %*($ add a 2, b 3)
+    5
+    
+    > %*(b [a=[12 14] b=[c=12 d=44]] c 11)
+    [c=11 d=44]
+    
+    > %*(b [a=[12 14] b=[c=12 d=44]] c 11, d 33)
+    [c=11 d=33]
+    
+    > =foo [a=1 b=2 c=3 d=4]
+    
+    > %*(+ foo c %hello, d %world)
+    [b=2 c=%hello d=%world]
+    
+    > =+(foo=[a=1 b=2 c=3] foo(b 7, c 10))
+    [a=1 b=7 c=10]
+    
+    > %*(foo [foo=[a=1 b=2 c=3]] b 7, c 10)
+    [a=1 b=7 c=10]
+<
+
+
+------------------------------------------------------------------------------
+CENTIS                                                                 *centis* *%=*
+
+Resolve a wing with changes.
+
+Syntax~
+
+One fixed argument, then a variable number of pairs.
+
+Tall: style #1>
+    %=  a=wing
+      b=wing  c=hoon
+      d=wing  e=hoon
+           ...
+      f=wing  g=hoon
+    ==
+<
+
+Tall: style #2>
+    %=    a=wing
+        b=wing
+      c=hoon
+    ::
+        d=wing
+      e=hoon
+    ::
+        f=wing
+      g=hoon
+    ==
+<
+
+Wide:
+>
+    %=(a b c, d e, f g)
+<
+
+Irregular:
+>
+      a(b c, d e, f g)
+<
+
+AST~
+>
+    [%cnts p=wing q=(list (pair wing hoon))]
+<
+
+Semantics~
+
+A `%=` expression resolves a wing of the subject, but with changes made.
+
+If `a` resolves to a leg, a series of changes are made to wings of that leg
+(`b`, `d`, and `f` above are replaced with the respective products of `c`,
+`e`, and `g` above). The modified leg is returned.
+
+If `a` resolves to an arm, a series of changes are made to wings of the parent
+core of that arm. (Again, `b`, `d`, and `f` are replaced with the respective
+products of `c`, `e`, and `g`.) The arm is computed with the modified core as
+the subject, and the product is returned.
+
+Discussion~
+
+Note that `a` is a wing, not just any expression. Knowing that a function call
+`(foo baz)` involves evaluating `foo`, replacing its sample at slot `+6` with
+`baz`, and then resolving to the `$` limb, you might think `(foo baz)` would
+mean `%=(foo +6 baz)`.
+
+But it's actually `=+(foo =>(%=(+2 +6 baz:+3) $))`. Even if `foo` is a wing,
+we would just be mutating `+6` within the core that defines the `foo` arm.
+Instead we want to modify the product of `foo`—the gate—so we have to pin it
+into the subject.
+
+Here's that again in tall form:
+>
+    =+  foo
+    =>  %=  +2
+          +6  baz:+3
+        ==
+      $
+<
+
+Examples~
+>
+    > =foo [p=5 q=6]
+    
+    > foo(p 42)
+    [p=42 q=6]
+    
+    > foo(+3 99)
+    [p=5 99]
+<
+
+
+==============================================================================
+CASTS                                                                        *Casts* *·*
+
+`^-` ("kethep"), `^+` ("ketlus"), and `^=` ("kettis") let us adjust types
+without violating type constraints.
+
+The `nest` algorithm which tests subtyping is conservative; it never allows
+invalid nests, it sometimes rejects valid nests.
+
+------------------------------------------------------------------------------
+KETBAR                                                                 *ketbar* *^|*
+
+Convert a gold core to an iron core (contravariant).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^|  p
+<
+
+Wide:
+>
+    ^|(p)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktbr p=hoon]
+<
+
+Produces~
+
+`p` as an iron core; crash if not a gold core.
+
+Discussion~
+
+An iron core is an opaque function (gate or door).
+
+Theorem: if type `x` nests within type `a`, and type `y` nests within type
+`b`, a core accepting `b` and producing `x` nests within a iron core accepting
+`y` and producing `a`.
+
+Informally, a function fits an interface if the function has a more specific
+result and/or a less specific argument than the interface.
+
+Examples~
+
+The prettyprinter shows the core metal (`.` gold, `|` iron):
+>
+    ~zod:dojo> |=(@ 1)
+    <1.gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+    
+    ~zod:dojo> ^|(|=(@ 1))
+    <1|gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+<
+
+
+------------------------------------------------------------------------------
+KETCOL                                                                 *ketcol* *^:*
+
+Switch parser into structure mode (mold definition) and produce a gate for
+type `p`.  (See `,` com which toggles modes.)
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^:  p
+<
+
+Wide:
+>
+    ^:(p)
+<
+
+Irregular:
+>
+    ,p
+<
+
+AST~
+>
+    [%ktcl p=spec]
+<
+
+Produces~
+
+A gate that returns the sample value if it is of the correct type, but crashes
+otherwise.
+
+Discussion~
+
+`^:` is used to produce a mold that crashes if its sample is of the wrong
+type.
+
+In structure mode, `[a=@ b=@]` is a mold for a cell, whereas in value mode
+it's a pair of molds.  Sometimes you need a structure in value mode, in which
+you can use `^:` or `,`.
+
+Molds used to produced their bunt value if they couldn't mold their sample.
+This is no longer the case: molds now crash if molding fails, so this rune is
+redundant in certain cases.
+
+One may expect that `^:(path /foo)` would result in a syntax error since `^:`
+only takes one child, but instead it will parse as `=< ^ %:(path /foo)`. Since
+`:` is the irregular syntax for `=<` this is is parsed as "get `^` (i.e. the
+mold for cells) from a subject of `(path /foo)`", with `:` being the irregular
+syntax for `=<`.
+
+Examples~
+>
+    > ^:  @
+    < 1.goa
+      { *
+        {our/@p now/@da eny/@uvJ}
+        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
+      }
+    >
+    
+    > (^:(@) 22)
+    22
+    
+    > (^:(@) [22 33])
+    ford: %ride failed to execute:
+    
+    > (,cord 55)
+    '7'
+    
+    > (ream ',@t')
+    [%ktcl p=[%base p=[%atom p=~.t]]]
+    
+    > (ream ',cord')
+    [%ktcl p=[%like p=~[%cord] q=~]]
+<
+
+
+------------------------------------------------------------------------------
+KETDOT                                                                 *ketdot* *^.*
+
+Typecast on value produced by passing `q` to `p`.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^.  p
+    q
+<
+
+Wide:
+>
+    ^.(p q)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktdt p=hoon q=hoon]
+<
+
+Expands to~
+>
+    ^+(%:(p q) q)
+<
+
+Discussion~
+
+`p` produces a gate and q is any Hoon expression.
+
+`^.` is particularly useful when `p` is a gate that 'cleans up' the type
+information about some piece of data. For example, `limo` is used to turn a
+raw noun of the appropriate shape into a genuine list. Hence we can use `^.`
+to cast with `limo` and similar gates, ensuring that the product has the
+desired type.
+
+Examples~
+>
+    > =mylist [11 22 33 ~]
+    
+    > ?~(mylist ~ i.mylist)
+    mint-vain
+    
+    > =mylist ^.(limo mylist)
+    
+    > ?~(mylist ~ i.mylist)
+    11
+    
+    > ?~(mylist ~ t.mylist)
+    ~[22 33]
+<
+
+
+------------------------------------------------------------------------------
+KETHEP                                                                 *kethep* *^-*
+
+Typecast by explicit type label.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^-  p
+    q
+<
+
+Wide:
+>
+    ^-(p q)
+<
+
+Irregular:
+>
+      `p`q
+<
+
+AST~
+>
+    [%kthp p=spec q=hoon]
+<
+
+Expands to~
+>
+    ^+(^*(p) q)
+<
+
+Discussion~
+
+It's a good practice to put a `^-` ("kethep") at the top of every arm
+(including gates, loops, etc). This cast is strictly necessary only in the
+presence of head recursion (otherwise you'll get a `rest-loop` error, or if
+you really screw up spectacularly an infinite loop in the compiler).
+
+Examples~
+>
+    ~zod:dojo> (add 90 7)
+    97
+    
+    ~zod:dojo> `@t`(add 90 7)
+    'a'
+    
+    ~zod:dojo> ^-(@t (add 90 7))
+    'a'
+    
+    /~zod:dojo> =foo |=  a=@
+                     ^-  (unit @ta)
+                     `a
+    
+    /~zod:dojo> (foo 97)
+    [~ ~.a]
+<
+
+------------------------------------------------------------------------------
+KETLUS                                                                 *ketlus* *^+*
+
+Typecast by inferred type.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^+  p
+    q
+<
+
+Wide:
+>
+    ^+(p q)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktls p=hoon q=hoon]
+<
+
+Produces~
+
+The value of `q` with the type of `p`, if the type of `q` nests within the
+type of `p`. Otherwise, `nest-fail`.
+
+Examples~
+>
+    ~zod:dojo> ^+('text' %a)
+    'a'
+<
+
+
+------------------------------------------------------------------------------
+KETPAM                                                                 *ketpam* *^&*
+
+Convert a core to a zinc core (covariant).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^&  p
+<
+
+Wide:
+>
+    ^&(p)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktpm p=hoon]
+<
+
+Produces~
+
+`p` as a zinc core; crash if `p` isn't a gold or zinc core.
+
+Discussion~
+
+A zinc core has a read-only sample and an opaque context. See Advanced types.
+
+Examples~
+
+The prettyprinter shows the core metal in the arm labels `1.xoz` and `1&xoz`
+below (`.` is gold, `&` is zinc):
+>
+    > |=(@ 1)
+    < 1.xoz
+      { @
+        {our/@p now/@da eny/@uvJ}
+        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
+      }
+    >
+    
+    > ^&(|=(@ 1))
+    < 1&xoz
+      { @
+        {our/@p now/@da eny/@uvJ}
+        <19.hqf 23.byz 5.mzd 36.apb 119.zmz 238.ipu 51.mcd 93.glm 74.dbd 1.qct $141>
+      }
+    >
+<
+
+You can read from the sample of a zinc core, but not change it:
+>
+    > =mycore ^&(|=(a=@ 1))
+    
+    > a.mycore
+    0
+    
+    > mycore(a 22)
+    -tack.a
+    -find.a
+    ford: %slim failed:
+    ford: %ride failed to compute type:
+<
+
+
+------------------------------------------------------------------------------
+KETSIG                                                                 *ketsig* *^~*
+
+Fold constant at compile time.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^~  p
+<
+
+Wide:
+>
+    ^~(p)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktsg p=hoon]
+<
+
+Produces~
+
+`p`, folded as a constant if possible.
+
+Examples~
+>
+    > (make '|-(42)')
+    [%8 p=[%1 p=[1 42]] q=[%9 p=2 q=[%0 p=1]]]
+    
+    > (make '^~(|-(42))')
+    [%1 p=42]
+<
+
+
+------------------------------------------------------------------------------
+KETTAR                                                                 *kettar* `^*`
+
+Produce example type value.
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^*  p
+<
+
+Wide:
+>
+    ^*(p)
+<
+
+Irregular:
+>
+      *p
+<
+
+`p` is any structure expression.
+
+AST~
+>
+    [%kttr p=spec]
+<
+
+Produces~
+
+A default value (i.e., 'bunt value') of the type `p`.
+
+Examples~
+
+Regular:
+>
+    > ^*  @
+    0
+    
+    > ^*  %baz
+    %baz
+    
+    > ^*  ^
+    [0 0]
+    
+    > ^*  ?
+    %.y
+<
+
+Irregular:
+>
+    > *@
+    0
+    
+    > *^
+    [0 0]
+    
+    > *tape
+    ""
+<
+
+
+------------------------------------------------------------------------------
+KETTIS                                                                 *kettis* *^=*
+
+Bind name to a value.
+
+Syntax~
+
+Two arguments, fixed.
+
+Tall:
+>
+    ^=  p
+    q
+<
+
+Wide:
+>
+    ^=(p q)
+<
+
+Irregular:
+>
+      p=q
+<
+
+AST~
+>
+    [%ktts p=skin q=hoon]
+<
+
+Produces~
+
+If `p` is a term, the product `q` with type `[%face p q]`. `p` may also be a
+tuple of terms, or a term-skin pair; the type of `q` must divide evenly into
+cells to match it.
+
+Examples~
+>
+    > a=1
+    a=1
+    
+    > ^=  a
+      1
+    a=1
+    
+    > ^=(a 1)
+    a=1
+    
+    > [b c d]=[1 2 3 4]
+    [b=1 c=2 d=[3 4]]
+    
+    > [b c d=[x y]]=[1 2 3 4]
+    [b=1 c=2 d=[x=3 y=4]]
+<
+
+
+------------------------------------------------------------------------------
+KETWUT                                                                 *ketwut* *^?*
+
+Convert any core to a lead core (bivariant).
+
+Syntax~
+
+One argument, fixed.
+
+Tall:
+>
+    ^?  p
+<
+
+Wide:
+>
+    ^?(p)
+<
+
+Irregular:
+
+- None.
+
+
+AST~
+>
+    [%ktwt p=hoon]
+<
+
+Produces~
+
+`p` as a lead core; crash if not a core.
+
+Discussion~
+
+A lead core is an opaque generator; the payload can't be read or written.
+
+Theorem: if type `x` nests within type `a`, a lead core producing `x` nests
+within a lead core producing `a`.
+
+Informally, a more specific generator can be used as a less specific
+generator.
+
+Examples~
+
+The prettyprinter shows the core metal (`.` gold, `?` lead):
+>
+    > |=(@ 1)
+    <1.gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
+    
+    > ^?(|=(@ 1))
+    <1?gcq [@  @n <250.yur 41.wda 374.hzt 100.kzl 1.ypj %151>]>
 <
