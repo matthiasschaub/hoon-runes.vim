@@ -7,7 +7,7 @@
 Author: ~talfus-laddus
 Repository: https://git.sr.ht/~matthias_schaub/hoon-runes.vim
 License: MIT License
-Updated: 2023-06-14
+Updated: 2023-06-30
 
 Runes are a way to form expressions in Hoon.
 
