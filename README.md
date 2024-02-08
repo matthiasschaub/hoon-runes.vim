@@ -6,7 +6,7 @@ Vim help file for Hoon Runes in disguise of a plugin.
 
 Using [vim-plug](https://github.com/junegunn/vim-plug):
 ```
-Plug 'https://github.com/matthiasschaub/hoon-runes.vim', { 'branch': 'main' }
+Plug 'matthiasschaub/hoon-runes.vim', { 'branch': 'main' }
 ```
 
 ## Usage
@@ -30,11 +30,11 @@ not work. Use `help buctis` instead.
 
 ## About
 
-The content is based on the [developers.urbit.org repository](https://github.com/urbit/developers.urbit.org/tree/main/content/reference/hoon/rune).
+The content is based on the [docs.urbit.org repository](https://github.com/urbit/docs.urbit.org).
 The only changes made to the content has been the removal of markdown links and reformatting of custom From/Syntax tables.
-The syntax has been changed from markdown to Vim helptext (Vimdoc) with [`decipher`](https://git.sr.ht/~talfus-laddus/decipher).
+The syntax has been changed from markdown to Vim helptext (Vimdoc) with [`decipher`](https://github.com/matthiasschaub/decipher).
 
-See also [hoon-stdlib.vim](https://git.sr.ht/~talfus-laddus/hoon-stdlib.vim)
+See also [hoon-stdlib.vim](https://github.com/matthiasschaub/hoon-stdlib.vim).
 
 Reach out to `~talfus-laddus` on Urbit for anything related to this plugin.
 
