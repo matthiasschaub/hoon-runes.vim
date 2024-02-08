@@ -6,7 +6,7 @@ Vim help file for Hoon Runes in disguise of a plugin.
 
 Using [vim-plug](https://github.com/junegunn/vim-plug):
 ```
-Plug 'https://git.sr.ht/~talfus-laddus/hoon-runes.vim', { 'branch': 'main' }
+Plug 'https://github.com/matthiasschaub/hoon-runes.vim', { 'branch': 'main' }
 ```
 
 ## Usage
